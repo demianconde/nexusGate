@@ -20,9 +20,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.api_key import get_api_tenant
 from app.cache import CachedResponse, get_cache
 from app.cache.semantic import prompt_text
+from app.config import get_settings
 from app.crypto import decrypt_secret
 from app.db.models import ProviderKey, Tenant
 from app.db.session import get_db
+from app.metrics import inc
 from app.providers.service import (
     ProviderError,
     ProviderService,
@@ -32,6 +34,7 @@ from app.providers.service import (
 )
 from app.routing.pricing import cost_usd, infer_provider
 from app.routing.router import choose_route, estimate_complexity
+from app.security.pii import redact_messages
 from app.usage import record_usage
 
 from .schemas import ChatCompletionRequest
@@ -143,12 +146,21 @@ async def chat_completions(
     tenant: Tenant = Depends(get_api_tenant),
     db: AsyncSession = Depends(get_db),
 ):
+    inc("nexus_requests_total")
+    settings = get_settings()
     plan = await _plan(db, tenant.id, body)
     base_upstream: dict = {"messages": [m.model_dump() for m in body.messages]}
     if body.max_tokens is not None:
         base_upstream["max_tokens"] = body.max_tokens
     if body.temperature is not None:
         base_upstream["temperature"] = body.temperature
+
+    def upstream_for(att: Attempt) -> dict:
+        """Monta o payload; redige PII para provedores hospedados (LGPD) se ativado."""
+        up = {**base_upstream, "model": att.model}
+        if settings.pii_guard and not att.is_local:
+            up["messages"] = redact_messages(up["messages"])
+        return up
 
     request_id = uuid.uuid4().hex
     tenant_id = tenant.id
@@ -172,6 +184,9 @@ async def chat_completions(
             cache_hit=True,
             latency_ms=0,
         )
+        inc("nexus_cache_hits_total")
+        inc("nexus_cost_saved_usd_total",
+            cost_usd(cached.model, cached.prompt_tokens, cached.completion_tokens))
         ch = {
             "x-nexus-request-id": request_id,
             "x-nexus-model": cached.model,
@@ -238,7 +253,7 @@ async def chat_completions(
             ok = False
             for idx, att in enumerate(plan.attempts):
                 used = att
-                upstream = {**base_upstream, "model": att.model}
+                upstream = upstream_for(att)
                 sent = False
                 try:
                     async for chunk in _service(att).stream(upstream, usage):
@@ -249,11 +264,16 @@ async def chat_completions(
                     break  # sucesso
                 except (ProviderError, httpx.HTTPError) as exc:
                     if sent or idx == len(plan.attempts) - 1:
+                        inc("nexus_errors_total")
                         yield openai_error_chunk(f"{type(exc).__name__}: {str(exc)[:300]}")
                         break
                     # local não deu conta → escala para o próximo (hospedado)
                     continue
             model_used = usage.model or used.model
+            inc("nexus_prompt_tokens_total", usage.prompt_tokens)
+            inc("nexus_completion_tokens_total", usage.completion_tokens)
+            inc("nexus_cost_saved_usd_total",
+                _saved(baseline, model_used, usage.prompt_tokens, usage.completion_tokens))
             if ok:
                 content = "".join(collected)
                 await cache.put(
@@ -293,12 +313,15 @@ async def chat_completions(
     last_exc: Exception | None = None
     for idx, att in enumerate(plan.attempts):
         try:
-            result = await _service(att).complete({**base_upstream, "model": att.model})
+            result = await _service(att).complete(upstream_for(att))
         except (ProviderError, httpx.HTTPError) as exc:
             last_exc = exc
             continue  # local/primário não deu conta → tenta o próximo
         model_used = result.usage.model or att.model
         pt, ct = result.usage.prompt_tokens, result.usage.completion_tokens
+        inc("nexus_prompt_tokens_total", pt)
+        inc("nexus_completion_tokens_total", ct)
+        inc("nexus_cost_saved_usd_total", _saved(baseline, model_used, pt, ct))
         await record_usage(
             tenant_id=tenant_id,
             request_id=request_id,
@@ -342,6 +365,7 @@ async def chat_completions(
         )
         return JSONResponse(payload, headers=headers_for(att, escalated=idx > 0))
 
+    inc("nexus_errors_total")
     raise HTTPException(
         status_code=status.HTTP_502_BAD_GATEWAY,
         detail=f"Todos os provedores falharam. Último erro: {str(last_exc)[:300]}",

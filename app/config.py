@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     # Envelope encryption (Fase 2)
     master_key: str | None = Field(default=None, alias="NEXUS_MASTER_KEY")
 
+    # Segurança (Fase 6): redige PII antes de enviar a provedores hospedados.
+    pii_guard: bool = Field(default=False, alias="NEXUS_PII_GUARD")
+
     # Cache semântico (Fase 4)
     cache_enabled: bool = Field(default=True, alias="NEXUS_CACHE_ENABLED")
     cache_threshold: float = Field(default=0.92, alias="NEXUS_CACHE_THRESHOLD")

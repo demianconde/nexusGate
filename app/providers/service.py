@@ -10,6 +10,7 @@ sempre normalizada para o formato OpenAI, para o cliente ter uma interface únic
 
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 from collections.abc import AsyncIterator
@@ -42,6 +43,28 @@ class ChatResult:
     content: str
     usage: Usage
     raw: dict = field(default_factory=dict)
+
+
+async def _post_retry(
+    url: str, headers: dict, json_body: dict, retries: int = 1
+) -> httpx.Response:
+    """POST com 1 retry em erros transitórios (timeout / 5xx)."""
+    delay = 0.6
+    resp: httpx.Response | None = None
+    for attempt in range(retries + 1):
+        async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+            try:
+                resp = await client.post(url, headers=headers, json=json_body)
+            except httpx.TimeoutException:
+                if attempt < retries:
+                    await asyncio.sleep(delay)
+                    continue
+                raise
+        if resp.status_code >= 500 and attempt < retries:
+            await asyncio.sleep(delay)
+            continue
+        return resp
+    return resp  # type: ignore[return-value]
 
 
 def _auth_headers(fmt: str, api_key: str) -> dict[str, str]:
@@ -103,10 +126,7 @@ class ProviderService:
         headers = {"content-type": "application/json"}
         if self.api_key:
             headers["authorization"] = f"Bearer {self.api_key}"
-        async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-            resp = await client.post(
-                self._ollama_url(), headers=headers, json=self._ollama_body(req, False)
-            )
+        resp = await _post_retry(self._ollama_url(), headers, self._ollama_body(req, False))
         if resp.status_code >= 400:
             raise ProviderError(resp.status_code, resp.text)
         data = resp.json()
@@ -164,12 +184,11 @@ class ProviderService:
 
     async def _complete_openai(self, req: dict) -> ChatResult:
         body = {**req, "stream": False}
-        async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-            resp = await client.post(
-                f"{self.base_url}/chat/completions",
-                headers=_auth_headers("openai", self.api_key),
-                json=body,
-            )
+        resp = await _post_retry(
+            f"{self.base_url}/chat/completions",
+            _auth_headers("openai", self.api_key),
+            body,
+        )
         if resp.status_code >= 400:
             raise ProviderError(resp.status_code, resp.text)
         data = resp.json()
@@ -198,12 +217,11 @@ class ProviderService:
             body["system"] = system
         if req.get("temperature") is not None:
             body["temperature"] = req["temperature"]
-        async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-            resp = await client.post(
-                f"{self.base_url}/v1/messages",
-                headers=_auth_headers("anthropic", self.api_key),
-                json=body,
-            )
+        resp = await _post_retry(
+            f"{self.base_url}/v1/messages",
+            _auth_headers("anthropic", self.api_key),
+            body,
+        )
         if resp.status_code >= 400:
             raise ProviderError(resp.status_code, resp.text)
         data = resp.json()

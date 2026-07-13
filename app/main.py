@@ -9,7 +9,7 @@ from pathlib import Path
 import structlog
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
 from app import __version__
@@ -17,6 +17,7 @@ from app.api import admin, billing, chat, health, provider_keys, proxy, usage
 from app.auth.supabase import DEV_ACCESS_TOKEN
 from app.config import get_settings
 from app.logging_config import configure_logging, get_logger
+from app.metrics import render_prometheus
 
 PUBLIC_DIR = Path(__file__).parent / "public"
 
@@ -77,6 +78,10 @@ def create_app() -> FastAPI:
     @app.get("/dashboard", include_in_schema=False)
     async def dashboard_page() -> FileResponse:
         return FileResponse(PUBLIC_DIR / "dashboard.html")
+
+    @app.get("/metrics", include_in_schema=False)
+    async def metrics() -> PlainTextResponse:
+        return PlainTextResponse(render_prometheus())
 
     @app.get("/public-config", include_in_schema=False)
     async def public_config() -> JSONResponse:

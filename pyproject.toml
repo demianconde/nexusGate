@@ -1,0 +1,22 @@
+[project]
+name = "nexusgate"
+version = "0.1.0"
+description = "NexusGate — LLM Gateway & Multi-Agent Proxy BYOK (SaaS)"
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+# B008: FastAPI usa `Depends()` em defaults de argumento por design.
+ignore = ["B008"]
+
+[tool.ruff.lint.per-file-ignores]
+# Migrations do Alembic costumam ter linhas longas (create_table); tudo bem.
+"alembic/versions/*" = ["E501"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

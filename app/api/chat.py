@@ -216,19 +216,24 @@ async def chat_completions(
             cost_saved_usd=_saved(baseline, model_used, pt, ct),
             latency_ms=now_ms() - started,
         )
-        payload = result.raw or {
-            "id": request_id,
-            "object": "chat.completion",
-            "model": result.model,
-            "choices": [
-                {"index": 0, "message": {"role": "assistant", "content": result.content},
-                 "finish_reason": "stop"}
-            ],
-            "usage": {
-                "prompt_tokens": result.usage.prompt_tokens,
-                "completion_tokens": result.usage.completion_tokens,
-            },
-        }
+        # Passthrough só quando o upstream já é formato OpenAI; senão, normaliza.
+        if result.raw and "choices" in result.raw:
+            payload = result.raw
+        else:
+            payload = {
+                "id": request_id,
+                "object": "chat.completion",
+                "model": result.model,
+                "choices": [
+                    {"index": 0, "message": {"role": "assistant", "content": result.content},
+                     "finish_reason": "stop"}
+                ],
+                "usage": {
+                    "prompt_tokens": result.usage.prompt_tokens,
+                    "completion_tokens": result.usage.completion_tokens,
+                    "total_tokens": result.usage.prompt_tokens + result.usage.completion_tokens,
+                },
+            }
         return JSONResponse(payload, headers=headers_for(att, escalated=idx > 0))
 
     raise HTTPException(

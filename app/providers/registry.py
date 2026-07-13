@@ -40,7 +40,7 @@ KNOWN_PROVIDERS: dict[str, ProviderSpec] = {
     ),
     # Locais — sem chave por padrão; base_url pode ser sobrescrita.
     "ollama": ProviderSpec(
-        "ollama", "Ollama (local)", "openai",
+        "ollama", "Ollama (local)", "ollama",
         "http://localhost:11434/v1", requires_key=False, local=True,
     ),
     "lmstudio": ProviderSpec(

@@ -17,8 +17,9 @@ from dataclasses import dataclass, field
 
 import httpx
 
-_TIMEOUT = httpx.Timeout(120.0, connect=10.0)
+_TIMEOUT = httpx.Timeout(300.0, connect=10.0)
 _ANTHROPIC_VERSION = "2023-06-01"
+_OLLAMA_NUM_CTX = 8192  # contexto fixo: modelos com 262k default estouram a memória
 
 
 class ProviderError(Exception):
@@ -73,7 +74,93 @@ class ProviderService:
     async def complete(self, req: dict) -> ChatResult:
         if self.fmt == "anthropic":
             return await self._complete_anthropic(req)
+        if self.fmt == "ollama":
+            return await self._complete_ollama(req)
         return await self._complete_openai(req)
+
+    # ---------- Ollama nativo (/api/chat): desliga thinking e fixa contexto ----------
+    def _ollama_url(self) -> str:
+        base = self.base_url
+        if base.endswith("/v1"):
+            base = base[:-3]
+        return base.rstrip("/") + "/api/chat"
+
+    def _ollama_body(self, req: dict, stream: bool) -> dict:
+        options: dict = {"num_ctx": _OLLAMA_NUM_CTX}
+        if req.get("max_tokens") is not None:
+            options["num_predict"] = req["max_tokens"]
+        if req.get("temperature") is not None:
+            options["temperature"] = req["temperature"]
+        return {
+            "model": req["model"],
+            "messages": req.get("messages", []),
+            "stream": stream,
+            "think": False,  # respostas diretas (sem gastar tokens "pensando")
+            "options": options,
+        }
+
+    async def _complete_ollama(self, req: dict) -> ChatResult:
+        headers = {"content-type": "application/json"}
+        if self.api_key:
+            headers["authorization"] = f"Bearer {self.api_key}"
+        async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+            resp = await client.post(
+                self._ollama_url(), headers=headers, json=self._ollama_body(req, False)
+            )
+        if resp.status_code >= 400:
+            raise ProviderError(resp.status_code, resp.text)
+        data = resp.json()
+        content = (data.get("message") or {}).get("content", "")
+        model = data.get("model", req["model"])
+        return ChatResult(
+            model=model,
+            content=content,
+            usage=Usage(
+                model=model,
+                prompt_tokens=data.get("prompt_eval_count", 0),
+                completion_tokens=data.get("eval_count", 0),
+            ),
+            raw=data,
+        )
+
+    async def _stream_ollama(self, req: dict, usage_out: Usage) -> AsyncIterator[bytes]:
+        headers = {"content-type": "application/json"}
+        if self.api_key:
+            headers["authorization"] = f"Bearer {self.api_key}"
+        async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+            async with client.stream(
+                "POST", self._ollama_url(), headers=headers, json=self._ollama_body(req, True)
+            ) as resp:
+                if resp.status_code >= 400:
+                    text = (await resp.aread()).decode("utf-8", "replace")
+                    raise ProviderError(resp.status_code, text)
+                async for line in resp.aiter_lines():
+                    if not line.strip():
+                        continue
+                    try:
+                        obj = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    model = obj.get("model", req["model"])
+                    content = (obj.get("message") or {}).get("content", "")
+                    if content:
+                        chunk = {
+                            "choices": [
+                                {"index": 0, "delta": {"role": "assistant", "content": content}}
+                            ],
+                            "model": model,
+                        }
+                        yield f"data: {json.dumps(chunk)}\n\n".encode()
+                    if obj.get("done"):
+                        usage_out.model = model
+                        usage_out.prompt_tokens = obj.get("prompt_eval_count", 0)
+                        usage_out.completion_tokens = obj.get("eval_count", 0)
+                        done = {
+                            "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
+                            "model": model,
+                        }
+                        yield f"data: {json.dumps(done)}\n\n".encode()
+                        yield b"data: [DONE]\n\n"
 
     async def _complete_openai(self, req: dict) -> ChatResult:
         body = {**req, "stream": False}
@@ -140,6 +227,9 @@ class ProviderService:
         """Gera bytes SSE no formato OpenAI. Preenche `usage_out` ao final."""
         if self.fmt == "anthropic":
             async for chunk in self._stream_anthropic(req, usage_out):
+                yield chunk
+        elif self.fmt == "ollama":
+            async for chunk in self._stream_ollama(req, usage_out):
                 yield chunk
         else:
             async for chunk in self._stream_openai(req, usage_out):

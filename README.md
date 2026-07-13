@@ -64,6 +64,8 @@ make dev                # uvicorn com reload
   - **`model: "nexus-auto"`** ativa o roteamento: classifica a complexidade e aplica **local-first com escalonamento** — tenta o provedor **local** primeiro (gratuito) e, se falhar, **escala** para o hospedado (o **premium** em tarefas complexas). Headers de resposta expõem a decisão: `x-nexus-model`, `x-nexus-provider`, `x-nexus-complexity`, `x-nexus-routed` (`auto`/`escalated`), `x-nexus-local`.
 
 > **Qualquer LLM, inclusive local:** cadastre uma credencial com `provider` conhecido (usa base_url padrão) ou `custom`/local com `base_url` própria (ex.: Ollama em `http://localhost:11434/v1`, sem API key). O painel detecta automaticamente se o endpoint é **local** e exibe o **modelo** configurado.
+>
+> **Ollama:** o provider `ollama` usa o `format: "ollama"` (API nativa `/api/chat`), com **thinking desligado** (`think: false`) e **contexto fixo** (`num_ctx: 8192`) — evita o crash de modelos com contexto declarado gigante (ex.: 262k) e mantém respostas rápidas. Defina o `default_model` para um modelo instalado (`ollama list`).
 
 Rate limiting por tenant (janela de 1 min): free=60, pro=600, enterprise=6000 req/min.
 

@@ -39,8 +39,9 @@
 
             <div class="panel glass">
                 <div class="panel-head">
-                    <h2>Chaves de API</h2>
+                    <h2>Chaves de API do NexusGate</h2>
                 </div>
+                <p class="muted" style="font-size:0.85rem;margin-bottom:1rem">Use estas chaves (<code>x-api-key</code>) nas suas aplicações para chamar o proxy.</p>
 
                 <div class="key-reveal" id="newKeyBox" style="display:none"></div>
 
@@ -51,6 +52,41 @@
 
                 <div id="keysContainer">
                     <div class="empty">Carregando chaves…</div>
+                </div>
+            </div>
+
+            <div class="panel glass">
+                <div class="panel-head">
+                    <h2>Credenciais BYOK (provedores de LLM)</h2>
+                </div>
+                <p class="muted" style="font-size:0.85rem;margin-bottom:1rem">Cadastre a chave do seu provedor (OpenAI, Anthropic, Qwen, Groq…) ou aponte para um <strong>modelo local</strong> (Ollama, LM Studio, vLLM). Ficam cifradas com AES-256-GCM.</p>
+
+                <form id="providerForm" style="margin-bottom:1.5rem">
+                    <div class="field">
+                        <label for="providerSelect">Provedor</label>
+                        <select class="input" id="providerSelect"></select>
+                    </div>
+                    <div class="field">
+                        <label for="providerLabel">Nome da API</label>
+                        <input class="input" id="providerLabel" type="text" placeholder="ex.: OpenAI produção">
+                    </div>
+                    <div class="field">
+                        <label for="providerBaseUrl">Base URL <span class="muted">(opcional — vazio usa o padrão do provedor)</span></label>
+                        <input class="input" id="providerBaseUrl" type="text" placeholder="https://...">
+                    </div>
+                    <div class="field">
+                        <label for="providerApiKey">API Key <span class="muted">(vazio para endpoints locais sem autenticação)</span></label>
+                        <input class="input" id="providerApiKey" type="password" placeholder="sk-..." autocomplete="off">
+                    </div>
+                    <div class="field">
+                        <label for="providerModel">Modelo <span class="muted">(padrão — recomendado para locais, ex.: llama3.1)</span></label>
+                        <input class="input" id="providerModel" type="text" placeholder="ex.: gpt-4o-mini, llama3.1, qwen2.5-coder">
+                    </div>
+                    <button class="btn btn-primary" type="submit" id="providerBtn">Adicionar credencial</button>
+                </form>
+
+                <div id="providersContainer">
+                    <div class="empty">Carregando credenciais…</div>
                 </div>
             </div>
         </div>
@@ -67,6 +103,14 @@
             const createBtn = document.getElementById('createBtn');
             const newKeyBox = document.getElementById('newKeyBox');
             const logoutBtn = document.getElementById('logoutBtn');
+            const providerForm = document.getElementById('providerForm');
+            const providerSelect = document.getElementById('providerSelect');
+            const providerLabel = document.getElementById('providerLabel');
+            const providerBaseUrl = document.getElementById('providerBaseUrl');
+            const providerApiKey = document.getElementById('providerApiKey');
+            const providerModel = document.getElementById('providerModel');
+            const providerBtn = document.getElementById('providerBtn');
+            const providersContainer = document.getElementById('providersContainer');
 
             let client = null;
             let token = null;
@@ -170,6 +214,92 @@
                 }
             }
 
+            // ----- Credenciais BYOK de provedores -----
+            async function loadKnownProviders() {
+                const res = await api('/v1/admin/providers');
+                if (!res.ok) return;
+                const { providers } = await res.json();
+                providerSelect.innerHTML = providers.map(p =>
+                    '<option value="' + p.key + '" data-base="' + (p.default_base_url || '') + '" data-local="' + p.local + '">'
+                    + escapeHtml(p.label) + '</option>').join('');
+                syncProviderPlaceholder();
+            }
+
+            function syncProviderPlaceholder() {
+                const opt = providerSelect.selectedOptions[0];
+                if (!opt) return;
+                const base = opt.getAttribute('data-base');
+                providerBaseUrl.placeholder = base ? ('Padrão: ' + base) : 'Base URL (obrigatória para custom)';
+            }
+            providerSelect.addEventListener('change', syncProviderPlaceholder);
+
+            async function loadProviderKeys() {
+                const res = await api('/v1/admin/provider-keys');
+                if (!res.ok) throw new Error('falha ao carregar credenciais');
+                const keys = await res.json();
+                if (keys.length === 0) {
+                    providersContainer.innerHTML = '<div class="empty">Nenhuma credencial ainda. Adicione a primeira acima.</div>';
+                    return;
+                }
+                let html = '<table class="table"><thead><tr><th>Provedor</th><th>Modelo</th><th>Endpoint</th><th>Nome da API</th><th></th></tr></thead><tbody>';
+                for (const k of keys) {
+                    const providerCell = escapeHtml(k.provider_label || k.provider)
+                        + (k.is_local ? ' <span class="badge-status active">Local</span>' : '');
+                    const model = k.default_model
+                        ? escapeHtml(k.default_model)
+                        : '<span class="text-mono-mut">' + (k.is_local ? '⚠ defina o modelo' : 'por requisição') + '</span>';
+                    html += '<tr>'
+                        + '<td>' + providerCell + '</td>'
+                        + '<td class="mono">' + model + '</td>'
+                        + '<td class="mono" style="font-size:0.78rem">' + escapeHtml(k.base_url || '—') + '</td>'
+                        + '<td>' + escapeHtml(k.label || '') + '</td>'
+                        + '<td><button class="btn btn-danger btn-sm" data-delprov="' + k.id + '">Remover</button></td>'
+                        + '</tr>';
+                }
+                html += '</tbody></table>';
+                providersContainer.innerHTML = html;
+                providersContainer.querySelectorAll('[data-delprov]').forEach(btn => {
+                    btn.addEventListener('click', () => deleteProviderKey(btn.getAttribute('data-delprov')));
+                });
+            }
+
+            providerForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                clearMsg();
+                providerBtn.disabled = true;
+                try {
+                    const payload = {
+                        provider: providerSelect.value,
+                        label: providerLabel.value.trim() || null,
+                        base_url: providerBaseUrl.value.trim() || null,
+                        api_key: providerApiKey.value || null,
+                        default_model: providerModel.value.trim() || null,
+                    };
+                    const res = await api('/v1/admin/provider-keys', { method: 'POST', body: JSON.stringify(payload) });
+                    if (!res.ok) {
+                        const err = await res.json().catch(() => ({}));
+                        throw new Error(err.detail || 'falha ao adicionar credencial');
+                    }
+                    providerLabel.value = ''; providerBaseUrl.value = ''; providerApiKey.value = ''; providerModel.value = '';
+                    showMsg('Credencial adicionada e cifrada.', 'ok');
+                    await loadProviderKeys();
+                } catch (err) {
+                    showMsg(err.message, 'error');
+                } finally {
+                    providerBtn.disabled = false;
+                }
+            });
+
+            async function deleteProviderKey(id) {
+                if (!confirm('Remover esta credencial de provedor?')) return;
+                clearMsg();
+                try {
+                    const res = await api('/v1/admin/provider-keys/' + id, { method: 'DELETE' });
+                    if (!res.ok && res.status !== 204) throw new Error('falha ao remover');
+                    await loadProviderKeys();
+                } catch (err) { showMsg(err.message, 'error'); }
+            }
+
             logoutBtn.addEventListener('click', async () => {
                 try { if (client) await client.auth.signOut(); } catch (e) { /* ignore */ }
                 localStorage.removeItem('nexus_token');
@@ -194,6 +324,8 @@
                 try {
                     await loadMe();
                     await loadKeys();
+                    await loadKnownProviders();
+                    await loadProviderKeys();
                 } catch (err) {
                     if (err.message !== 'não autorizado') showMsg(err.message, 'error');
                 }

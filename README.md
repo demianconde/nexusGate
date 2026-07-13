@@ -54,8 +54,15 @@ make dev                # uvicorn com reload
 - `POST /v1/admin/keys` `{ "name": "..." }` — cria chave (retorna o valor em claro **só aqui**)
 - `DELETE /v1/admin/keys/{id}` — revoga a chave
 
+**Painel — credenciais BYOK (auth Supabase):**
+- `GET /v1/admin/providers` — provedores conhecidos (atalhos de base_url/format)
+- `GET/POST/DELETE /v1/admin/provider-keys` — CRUD das credenciais de provedor (cifradas at-rest). Campos: `provider`, `api_key` (opcional p/ locais), `base_url` (opcional), `format`, `label` (Nome da API), `default_model`.
+
 **Proxy / plano de dados (auth `x-api-key: nxg_....`):**
-- `GET /v1/whoami` — resolve o tenant a partir da chave (após rate limit). O `/v1/chat/completions` real chega na Fase 2.
+- `GET /v1/whoami` — resolve o tenant a partir da chave (após rate limit).
+- `POST /v1/chat/completions` — proxy compatível com o formato OpenAI. Resolve a credencial BYOK do tenant, chama o provedor real (qualquer LLM/local), faz streaming SSE (`stream: true`) e grava `usage_logs`. O provedor é inferido do modelo ou informado em `provider`.
+
+> **Qualquer LLM, inclusive local:** cadastre uma credencial com `provider` conhecido (usa base_url padrão) ou `custom`/local com `base_url` própria (ex.: Ollama em `http://localhost:11434/v1`, sem API key). O painel detecta automaticamente se o endpoint é **local** e exibe o **modelo** configurado.
 
 Rate limiting por tenant (janela de 1 min): free=60, pro=600, enterprise=6000 req/min.
 
@@ -105,7 +112,7 @@ tests/                 # pytest
 ## Roadmap (fases)
 - **F0 Fundação** ✅ scaffold, DB async + Alembic, /health, Docker, CI
 - **F1 Multi-tenant + Auth** ✅ Supabase real, provisionamento de tenants/users, CRUD de x-api-key, rate-limiting por tenant
-- **F2 Proxy BYOK real** — envelope encryption, chamadas reais com streaming
+- **F2 Proxy BYOK real** ✅ envelope encryption (AES-256-GCM), CRUD de credenciais de provedor, `/v1/chat/completions` com streaming e gravação de uso. Suporta **qualquer LLM**: OpenAI-compatível (OpenAI, Qwen, Groq, DeepSeek, Together, OpenRouter, Gemini) e **locais** (Ollama, LM Studio, vLLM, LocalAI), além de Anthropic.
 - **F3 Roteamento + Economia** — router de custo, dashboard de economia
 - **F4 Cache semântico real** — embeddings (fastembed) + Redis vetorial
 - **F5 Billing** — Stripe metered, planos, webhooks

@@ -73,7 +73,12 @@ class NexusApiKey(Base):
 
 
 class ProviderKey(Base):
-    """Chave BYOK do provedor (OpenAI/Anthropic/Qwen), criptografada at-rest."""
+    """Credencial BYOK de um provedor de LLM, criptografada at-rest.
+
+    Suporta qualquer LLM: `format` define o protocolo (openai-compatível ou
+    anthropic) e `base_url` o endpoint (inclui modelos locais, ex.: Ollama).
+    A chave em si pode ser vazia (endpoints locais sem autenticação).
+    """
 
     __tablename__ = "provider_keys"
 
@@ -82,6 +87,10 @@ class ProviderKey(Base):
         ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True
     )
     provider: Mapped[str] = mapped_column(String(50), nullable=False)
+    format: Mapped[str] = mapped_column(String(20), nullable=False, default="openai")
+    base_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    label: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    default_model: Mapped[str | None] = mapped_column(String(150), nullable=True)
     ciphertext: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     nonce: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     dek_wrapped: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)

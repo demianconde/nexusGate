@@ -32,3 +32,40 @@ class ApiKeyInfo(BaseModel):
 class ApiKeyCreated(ApiKeyInfo):
     # Chave completa em claro — retornada APENAS na criação.
     api_key: str
+
+
+# ---------- Provider keys (BYOK) ----------
+class ProviderKeyCreate(BaseModel):
+    provider: str  # openai, anthropic, qwen, ollama, custom, ...
+    api_key: str | None = None  # opcional (endpoints locais podem não exigir)
+    base_url: str | None = None  # sobrescreve o default do provedor (obrigatório p/ custom/local)
+    format: str | None = None  # "openai" | "anthropic" (default vem do registry)
+    label: str | None = None  # "Nome da API"
+    default_model: str | None = None  # modelo padrão (útil p/ locais)
+
+
+class ProviderKeyInfo(BaseModel):
+    id: uuid.UUID
+    provider: str
+    provider_label: str  # nome amigável detectado do registry
+    format: str
+    base_url: str | None = None
+    label: str | None = None
+    default_model: str | None = None
+    is_local: bool = False
+    created_at: datetime
+
+
+# ---------- Chat completions ----------
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
+
+class ChatCompletionRequest(BaseModel):
+    model: str
+    messages: list[ChatMessage]
+    provider: str | None = None  # se omitido, é inferido do nome do modelo
+    stream: bool = False
+    max_tokens: int | None = None
+    temperature: float | None = None

@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app import __version__
-from app.api import admin, health, proxy
+from app.api import admin, chat, health, provider_keys, proxy
 from app.auth.supabase import DEV_ACCESS_TOKEN
 from app.config import get_settings
 from app.logging_config import configure_logging, get_logger
@@ -60,6 +60,8 @@ def create_app() -> FastAPI:
 
     app.include_router(health.router)
     app.include_router(admin.router)
+    app.include_router(provider_keys.router)
+    app.include_router(chat.router)
     app.include_router(proxy.router)
 
     @app.get("/", include_in_schema=False)

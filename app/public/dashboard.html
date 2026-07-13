@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel · NexusGate</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <script src="/static/vendor/supabase.js"></script>
+</head>
+<body>
+    <div class="bg-blobs"><div class="blob b1"></div><div class="blob b2"></div></div>
+
+    <nav class="nav dash-nav glass">
+        <div class="container nav-inner">
+            <div class="logo"><span class="mark">∞</span><span>NexusGate</span></div>
+            <div class="nav-cta">
+                <a href="/docs" class="link-quiet">API</a>
+                <button class="btn btn-ghost btn-sm" id="logoutBtn">Sair</button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="dash-main">
+        <div class="container">
+            <div class="msg" id="msg"></div>
+
+            <div class="dash-head">
+                <div>
+                    <h1>Seu painel</h1>
+                    <p id="whoami">Carregando…</p>
+                </div>
+            </div>
+
+            <div class="stat-grid" id="stats" style="display:none">
+                <div class="stat glass"><div class="k">Plano</div><div class="v" id="statPlan">—</div></div>
+                <div class="stat glass"><div class="k">Papel</div><div class="v" id="statRole">—</div></div>
+                <div class="stat glass"><div class="k">Chaves ativas</div><div class="v" id="statKeys">—</div></div>
+            </div>
+
+            <div class="panel glass">
+                <div class="panel-head">
+                    <h2>Chaves de API</h2>
+                </div>
+
+                <div class="key-reveal" id="newKeyBox" style="display:none"></div>
+
+                <form class="row-inline" id="createForm" style="margin-bottom:1.5rem">
+                    <input class="input" type="text" id="keyName" placeholder="Nome da chave (ex.: app-producao)" required>
+                    <button class="btn btn-primary" type="submit" id="createBtn">Criar chave</button>
+                </form>
+
+                <div id="keysContainer">
+                    <div class="empty">Carregando chaves…</div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        (function () {
+            const msg = document.getElementById('msg');
+            const whoami = document.getElementById('whoami');
+            const stats = document.getElementById('stats');
+            const keysContainer = document.getElementById('keysContainer');
+            const createForm = document.getElementById('createForm');
+            const keyName = document.getElementById('keyName');
+            const createBtn = document.getElementById('createBtn');
+            const newKeyBox = document.getElementById('newKeyBox');
+            const logoutBtn = document.getElementById('logoutBtn');
+
+            let client = null;
+            let token = null;
+
+            function showMsg(text, type) { msg.textContent = text; msg.className = 'msg show ' + type; }
+            function clearMsg() { msg.className = 'msg'; }
+            function goLogin() { window.location.href = '/login'; }
+
+            async function api(path, options = {}) {
+                const res = await fetch(path, {
+                    ...options,
+                    headers: {
+                        'Authorization': 'Bearer ' + token,
+                        'Content-Type': 'application/json',
+                        ...(options.headers || {}),
+                    },
+                });
+                if (res.status === 401 || res.status === 403) { goLogin(); throw new Error('não autorizado'); }
+                return res;
+            }
+
+            function fmtDate(iso) {
+                try { return new Date(iso).toLocaleDateString('pt-BR'); } catch (e) { return iso; }
+            }
+
+            async function loadMe() {
+                const res = await api('/v1/admin/me');
+                if (!res.ok) throw new Error('falha ao carregar perfil');
+                const me = await res.json();
+                whoami.textContent = 'Tenant ' + me.tenant_id;
+                document.getElementById('statPlan').textContent = me.plan;
+                document.getElementById('statRole').textContent = me.role;
+                stats.style.display = '';
+            }
+
+            async function loadKeys() {
+                const res = await api('/v1/admin/keys');
+                if (!res.ok) throw new Error('falha ao carregar chaves');
+                const keys = await res.json();
+                const active = keys.filter(k => !k.revoked_at).length;
+                document.getElementById('statKeys').textContent = active;
+
+                if (keys.length === 0) {
+                    keysContainer.innerHTML = '<div class="empty">Nenhuma chave ainda. Crie a primeira acima.</div>';
+                    return;
+                }
+                let html = '<table class="table"><thead><tr><th>Nome</th><th>Prefixo</th><th>Criada</th><th>Status</th><th></th></tr></thead><tbody>';
+                for (const k of keys) {
+                    const revoked = !!k.revoked_at;
+                    html += '<tr>'
+                        + '<td>' + escapeHtml(k.name) + '</td>'
+                        + '<td class="mono">' + escapeHtml(k.key_prefix) + '…</td>'
+                        + '<td>' + fmtDate(k.created_at) + '</td>'
+                        + '<td><span class="badge-status ' + (revoked ? 'revoked' : 'active') + '">' + (revoked ? 'revogada' : 'ativa') + '</span></td>'
+                        + '<td>' + (revoked ? '' : '<button class="btn btn-danger btn-sm" data-revoke="' + k.id + '">Revogar</button>') + '</td>'
+                        + '</tr>';
+                }
+                html += '</tbody></table>';
+                keysContainer.innerHTML = html;
+
+                keysContainer.querySelectorAll('[data-revoke]').forEach(btn => {
+                    btn.addEventListener('click', () => revokeKey(btn.getAttribute('data-revoke')));
+                });
+            }
+
+            function escapeHtml(s) {
+                return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+            }
+
+            createForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                clearMsg();
+                createBtn.disabled = true;
+                try {
+                    const res = await api('/v1/admin/keys', {
+                        method: 'POST',
+                        body: JSON.stringify({ name: keyName.value.trim() }),
+                    });
+                    if (!res.ok) throw new Error('falha ao criar chave');
+                    const created = await res.json();
+                    newKeyBox.style.display = 'block';
+                    newKeyBox.innerHTML = '⚠ Copie agora — esta chave não será exibida de novo:<br><strong>' + escapeHtml(created.api_key) + '</strong>';
+                    keyName.value = '';
+                    await loadKeys();
+                } catch (err) {
+                    showMsg(err.message || 'Erro ao criar chave.', 'error');
+                } finally {
+                    createBtn.disabled = false;
+                }
+            });
+
+            async function revokeKey(id) {
+                if (!confirm('Revogar esta chave? Aplicações que a usam vão parar de funcionar.')) return;
+                clearMsg();
+                try {
+                    const res = await api('/v1/admin/keys/' + id, { method: 'DELETE' });
+                    if (!res.ok && res.status !== 204) throw new Error('falha ao revogar');
+                    await loadKeys();
+                } catch (err) {
+                    showMsg(err.message || 'Erro ao revogar.', 'error');
+                }
+            }
+
+            logoutBtn.addEventListener('click', async () => {
+                try { if (client) await client.auth.signOut(); } catch (e) { /* ignore */ }
+                localStorage.removeItem('nexus_token');
+                goLogin();
+            });
+
+            async function init() {
+                let cfg;
+                try { cfg = await (await fetch('/public-config')).json(); } catch (e) { cfg = { configured: false }; }
+
+                if (cfg.configured) {
+                    client = window.supabase.createClient(cfg.supabase_url, cfg.supabase_anon_key);
+                    const { data } = await client.auth.getSession();  // também captura sessão vinda de link mágico
+                    if (data.session) {
+                        token = data.session.access_token;
+                        localStorage.setItem('nexus_token', token);
+                    }
+                }
+                if (!token) token = localStorage.getItem('nexus_token');
+                if (!token) { goLogin(); return; }
+
+                try {
+                    await loadMe();
+                    await loadKeys();
+                } catch (err) {
+                    if (err.message !== 'não autorizado') showMsg(err.message, 'error');
+                }
+            }
+
+            init();
+        })();
+    </script>
+</body>
+</html>

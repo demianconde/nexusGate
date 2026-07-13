@@ -59,6 +59,23 @@ make dev                # uvicorn com reload
 
 Rate limiting por tenant (janela de 1 min): free=60, pro=600, enterprise=6000 req/min.
 
+## Login & Painel (Supabase)
+
+Páginas web (sem build, sem CDN — Supabase JS servido localmente em `/static/vendor/`):
+- `/` — landing (página de vendas)
+- `/login` — login/cadastro via Supabase (senha, cadastro e link mágico)
+- `/dashboard` — painel protegido: perfil/plano e CRUD de chaves de API
+- `/public-config` — expõe ao browser a URL + anon key do Supabase (a anon key é pública por design)
+
+**Para habilitar o login**, crie um projeto no [Supabase](https://supabase.com), pegue em *Project Settings → API* a **Project URL** e a **anon public key**, e preencha no `.env`:
+
+```bash
+SUPABASE_URL=https://xxxxxxxx.supabase.co
+SUPABASE_ANON_KEY=eyJ...   # anon public (não a service_role)
+```
+
+Reinicie a API. Sem essas variáveis, `/login` mostra um aviso e o backend rejeita tokens (o painel exige um usuário Supabase válido). O fluxo: usuário loga no Supabase → recebe JWT → o painel chama `/v1/admin/*` com `Authorization: Bearer <jwt>` → o backend valida no Supabase e provisiona tenant/usuário no primeiro acesso.
+
 ## Estrutura
 ```
 app/

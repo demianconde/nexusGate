@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Entrar · NexusGate</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <script src="/static/vendor/supabase.js"></script>
+</head>
+<body>
+    <div class="bg-blobs"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div></div>
+    <a href="/" class="back-home">← Voltar ao site</a>
+
+    <div class="auth-wrap">
+        <div class="auth-card glass">
+            <div class="auth-logo"><span class="mark">∞</span><span>NexusGate</span></div>
+            <p class="auth-sub" id="subtitle">Entre para acessar seu painel</p>
+
+            <div class="msg" id="msg"></div>
+
+            <form id="authForm">
+                <div class="field">
+                    <label for="email">E-mail</label>
+                    <input class="input" type="email" id="email" placeholder="voce@empresa.com.br" required autocomplete="email">
+                </div>
+                <div class="field" id="passwordField">
+                    <label for="password">Senha</label>
+                    <input class="input" type="password" id="password" placeholder="••••••••" autocomplete="current-password">
+                </div>
+                <button class="btn btn-primary btn-block" type="submit" id="submitBtn">Entrar</button>
+            </form>
+
+            <div class="auth-alt">
+                <button class="link-btn" id="magicLinkBtn" type="button">Entrar com link mágico (sem senha)</button>
+            </div>
+
+            <div class="divider">ou</div>
+
+            <div class="auth-alt" id="toggleWrap">
+                <span id="toggleText">Não tem conta?</span>
+                <button class="link-btn" id="toggleBtn" type="button">Criar conta</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            const msg = document.getElementById('msg');
+            const form = document.getElementById('authForm');
+            const emailEl = document.getElementById('email');
+            const passwordEl = document.getElementById('password');
+            const passwordField = document.getElementById('passwordField');
+            const submitBtn = document.getElementById('submitBtn');
+            const subtitle = document.getElementById('subtitle');
+            const toggleText = document.getElementById('toggleText');
+            const toggleBtn = document.getElementById('toggleBtn');
+            const magicLinkBtn = document.getElementById('magicLinkBtn');
+
+            let mode = 'signin'; // 'signin' | 'signup'
+            let client = null;
+
+            function showMsg(text, type) {
+                msg.textContent = text;
+                msg.className = 'msg show ' + type;
+            }
+            function clearMsg() { msg.className = 'msg'; }
+
+            async function init() {
+                let cfg;
+                try {
+                    cfg = await (await fetch('/public-config')).json();
+                } catch (e) {
+                    showMsg('Não foi possível carregar a configuração do servidor.', 'error');
+                    return;
+                }
+                if (!cfg.configured) {
+                    showMsg('Supabase ainda não configurado. Defina SUPABASE_URL e SUPABASE_ANON_KEY no .env do servidor para habilitar o login.', 'warn');
+                    submitBtn.disabled = true;
+                    magicLinkBtn.disabled = true;
+                    return;
+                }
+                client = window.supabase.createClient(cfg.supabase_url, cfg.supabase_anon_key);
+
+                // Já logado? Vai direto ao dashboard.
+                const { data } = await client.auth.getSession();
+                if (data.session) {
+                    localStorage.setItem('nexus_token', data.session.access_token);
+                    window.location.href = '/dashboard';
+                }
+            }
+
+            function setMode(next) {
+                mode = next;
+                if (mode === 'signin') {
+                    subtitle.textContent = 'Entre para acessar seu painel';
+                    submitBtn.textContent = 'Entrar';
+                    toggleText.textContent = 'Não tem conta?';
+                    toggleBtn.textContent = 'Criar conta';
+                } else {
+                    subtitle.textContent = 'Crie sua conta gratuita';
+                    submitBtn.textContent = 'Criar conta';
+                    toggleText.textContent = 'Já tem conta?';
+                    toggleBtn.textContent = 'Entrar';
+                }
+                clearMsg();
+            }
+
+            toggleBtn.addEventListener('click', () => setMode(mode === 'signin' ? 'signup' : 'signin'));
+
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                if (!client) return;
+                clearMsg();
+                submitBtn.disabled = true;
+                const email = emailEl.value.trim();
+                const password = passwordEl.value;
+                try {
+                    if (mode === 'signup') {
+                        const { data, error } = await client.auth.signUp({ email, password });
+                        if (error) throw error;
+                        if (data.session) {
+                            localStorage.setItem('nexus_token', data.session.access_token);
+                            window.location.href = '/dashboard';
+                        } else {
+                            showMsg('Conta criada! Confirme seu e-mail para ativar o acesso.', 'ok');
+                        }
+                    } else {
+                        const { data, error } = await client.auth.signInWithPassword({ email, password });
+                        if (error) throw error;
+                        localStorage.setItem('nexus_token', data.session.access_token);
+                        window.location.href = '/dashboard';
+                    }
+                } catch (err) {
+                    showMsg(err.message || 'Falha na autenticação.', 'error');
+                } finally {
+                    submitBtn.disabled = false;
+                }
+            });
+
+            magicLinkBtn.addEventListener('click', async () => {
+                if (!client) return;
+                const email = emailEl.value.trim();
+                if (!email) { showMsg('Informe seu e-mail para receber o link.', 'error'); return; }
+                clearMsg();
+                magicLinkBtn.disabled = true;
+                try {
+                    const redirectTo = window.location.origin + '/dashboard';
+                    const { error } = await client.auth.signInWithOtp({ email, options: { emailRedirectTo: redirectTo } });
+                    if (error) throw error;
+                    showMsg('Link mágico enviado! Verifique seu e-mail.', 'ok');
+                } catch (err) {
+                    showMsg(err.message || 'Não foi possível enviar o link.', 'error');
+                } finally {
+                    magicLinkBtn.disabled = false;
+                }
+            });
+
+            init();
+        })();
+    </script>
+</body>
+</html>

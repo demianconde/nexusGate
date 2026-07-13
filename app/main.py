@@ -9,7 +9,7 @@ from pathlib import Path
 import structlog
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app import __version__
@@ -65,7 +65,26 @@ def create_app() -> FastAPI:
     async def landing() -> FileResponse:
         return FileResponse(PUBLIC_DIR / "landing.html")
 
-    # Assets estáticos futuros (css/js/imagens) em app/public/.
+    @app.get("/login", include_in_schema=False)
+    async def login_page() -> FileResponse:
+        return FileResponse(PUBLIC_DIR / "login.html")
+
+    @app.get("/dashboard", include_in_schema=False)
+    async def dashboard_page() -> FileResponse:
+        return FileResponse(PUBLIC_DIR / "dashboard.html")
+
+    @app.get("/public-config", include_in_schema=False)
+    async def public_config() -> JSONResponse:
+        """Config pública (anon key do Supabase é destinada ao browser)."""
+        return JSONResponse(
+            {
+                "supabase_url": settings.supabase_url or "",
+                "supabase_anon_key": settings.supabase_anon_key or "",
+                "configured": bool(settings.supabase_url and settings.supabase_anon_key),
+            }
+        )
+
+    # Assets estáticos (css/js/vendor) em app/public/.
     app.mount("/static", StaticFiles(directory=PUBLIC_DIR), name="static")
 
     return app

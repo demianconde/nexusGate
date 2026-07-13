@@ -102,6 +102,7 @@
                     <div class="stat glass"><div class="k">Requisições</div><div class="v" id="uRequests">—</div></div>
                     <div class="stat glass"><div class="k">Tokens totais</div><div class="v" id="uTokens">—</div></div>
                     <div class="stat glass"><div class="k">Custo real (BYOK)</div><div class="v" id="uCost">—</div></div>
+                    <div class="stat glass"><div class="k">Economia por roteamento (nexus-auto)</div><div class="v" id="uSaved" style="color:var(--brand-300)">—</div></div>
                 </div>
 
                 <div class="compare">
@@ -147,6 +148,7 @@
             const uRequests = document.getElementById('uRequests');
             const uTokens = document.getElementById('uTokens');
             const uCost = document.getElementById('uCost');
+            const uSaved = document.getElementById('uSaved');
             const baselineSelect = document.getElementById('baselineSelect');
             const cReal = document.getElementById('cReal');
             const cBaseline = document.getElementById('cBaseline');
@@ -371,6 +373,7 @@
                 uRequests.textContent = fmtInt(t.requests);
                 uTokens.textContent = fmtInt(t.total_tokens);
                 uCost.textContent = fmtUsd(t.cost_usd);
+                uSaved.textContent = fmtUsd(t.cost_saved_usd || 0);
 
                 if (!usageData.per_model.length) {
                     usageContainer.innerHTML = '<div class="empty">Ainda não há uso registrado. Faça uma chamada em /v1/chat/completions.</div>';

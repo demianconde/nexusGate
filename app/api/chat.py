@@ -1,13 +1,16 @@
 """Endpoint de proxy de LLM (plano de dados, auth por x-api-key).
 
-Resolve a credencial BYOK do tenant, chama o provedor real (qualquer LLM/local),
-faz streaming SSE e grava o uso em usage_logs.
+Resolve a credencial BYOK do tenant, opcionalmente roteia por complexidade
+(`model: "nexus-auto"`) com política **local-first + escalonamento**, chama o
+provedor real (qualquer LLM/local), faz streaming SSE e grava o uso (com economia).
 """
 
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass, field
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy import select
@@ -25,6 +28,7 @@ from app.providers.service import (
     openai_error_chunk,
 )
 from app.routing.pricing import cost_usd, infer_provider
+from app.routing.router import choose_route, estimate_complexity
 from app.usage import record_usage
 
 from .schemas import ChatCompletionRequest
@@ -32,22 +36,87 @@ from .schemas import ChatCompletionRequest
 router = APIRouter(prefix="/v1", tags=["proxy"])
 
 
-async def _resolve_provider_key(
-    db: AsyncSession, tenant_id: uuid.UUID, provider: str
-) -> ProviderKey:
+@dataclass
+class Attempt:
+    record: ProviderKey
+    provider: str
+    model: str
+    is_local: bool = False
+
+
+@dataclass
+class Plan:
+    attempts: list[Attempt]  # ordem: primária → escalonamento
+    baseline_model: str | None
+    complexity: str | None
+    routed: bool = False
+    _svc_cache: dict = field(default_factory=dict)
+
+
+async def _tenant_provider_keys(db: AsyncSession, tenant_id: uuid.UUID) -> list[ProviderKey]:
     result = await db.execute(
         select(ProviderKey)
-        .where(ProviderKey.tenant_id == tenant_id, ProviderKey.provider == provider)
+        .where(ProviderKey.tenant_id == tenant_id)
         .order_by(ProviderKey.created_at.desc())
     )
-    record = result.scalars().first()
+    return list(result.scalars().all())
+
+
+async def _plan(db: AsyncSession, tenant_id: uuid.UUID, body: ChatCompletionRequest) -> Plan:
+    keys = await _tenant_provider_keys(db, tenant_id)
+
+    if body.model == "nexus-auto":
+        if not keys:
+            raise HTTPException(400, "Nenhuma credencial de provedor cadastrada para rotear.")
+        complexity = estimate_complexity([m.model_dump() for m in body.messages])
+        route = choose_route(complexity, keys)
+        if route is None:
+            raise HTTPException(
+                400,
+                "Sem modelo elegível para roteamento. Defina 'default_model' nas "
+                "credenciais locais/custom.",
+            )
+        attempts = [
+            Attempt(route.provider_key, route.provider_key.provider, route.model, route.is_local)
+        ]
+        if route.escalation is not None:
+            e = route.escalation
+            attempts.append(Attempt(e.provider_key, e.provider_key.provider, e.model, e.is_local))
+        return Plan(
+            attempts=attempts,
+            baseline_model=route.baseline_model,
+            complexity=route.complexity,
+            routed=True,
+        )
+
+    provider = body.provider or infer_provider(body.model)
+    if not provider:
+        raise HTTPException(
+            400, "Não foi possível inferir o provedor pelo modelo. Envie o campo 'provider'."
+        )
+    record = next((k for k in keys if k.provider == provider), None)
     if record is None:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Nenhuma credencial cadastrada para o provedor '{provider}'. "
+            400,
+            f"Nenhuma credencial cadastrada para o provedor '{provider}'. "
             f"Cadastre uma em /v1/admin/provider-keys.",
         )
-    return record
+    return Plan(
+        attempts=[Attempt(record, provider, body.model)],
+        baseline_model=None,
+        complexity=None,
+    )
+
+
+def _service(att: Attempt) -> ProviderService:
+    api_key = decrypt_secret(att.record.ciphertext, att.record.nonce, att.record.dek_wrapped)
+    return ProviderService(att.record.base_url, api_key, att.record.format)
+
+
+def _saved(baseline_model: str | None, model: str, pt: int, ct: int) -> float:
+    if not baseline_model or baseline_model == model:
+        return 0.0
+    return max(0.0, cost_usd(baseline_model, pt, ct) - cost_usd(model, pt, ct))
 
 
 @router.post("/chat/completions")
@@ -56,99 +125,113 @@ async def chat_completions(
     tenant: Tenant = Depends(get_api_tenant),
     db: AsyncSession = Depends(get_db),
 ):
-    if body.model == "nexus-auto":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Roteamento automático (nexus-auto) chega na Fase 3. Especifique um modelo.",
-        )
-
-    provider = body.provider or infer_provider(body.model)
-    if not provider:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Não foi possível inferir o provedor pelo modelo. Envie o campo 'provider'.",
-        )
-
-    record = await _resolve_provider_key(db, tenant.id, provider)
-    api_key = decrypt_secret(record.ciphertext, record.nonce, record.dek_wrapped)
-    service = ProviderService(record.base_url, api_key, record.format)
-
-    upstream: dict = {"model": body.model, "messages": [m.model_dump() for m in body.messages]}
+    plan = await _plan(db, tenant.id, body)
+    base_upstream: dict = {"messages": [m.model_dump() for m in body.messages]}
     if body.max_tokens is not None:
-        upstream["max_tokens"] = body.max_tokens
+        base_upstream["max_tokens"] = body.max_tokens
     if body.temperature is not None:
-        upstream["temperature"] = body.temperature
+        base_upstream["temperature"] = body.temperature
 
     request_id = uuid.uuid4().hex
     tenant_id = tenant.id
+    baseline = plan.baseline_model
 
+    def headers_for(att: Attempt, escalated: bool) -> dict:
+        h = {
+            "x-nexus-request-id": request_id,
+            "x-nexus-model": att.model,
+            "x-nexus-provider": att.provider,
+        }
+        if plan.routed:
+            h["x-nexus-complexity"] = plan.complexity or ""
+            h["x-nexus-routed"] = "escalated" if escalated else "auto"
+            h["x-nexus-local"] = "true" if att.is_local else "false"
+        return h
+
+    # ---------- streaming ----------
     if body.stream:
-        usage = Usage()
+        first = plan.attempts[0]
 
         async def event_stream():
             started = now_ms()
-            try:
-                async for chunk in service.stream(upstream, usage):
-                    yield chunk
-            except ProviderError as exc:
-                yield openai_error_chunk(f"[{exc.status_code}] {exc.message[:300]}")
-            finally:
-                model_used = usage.model or body.model
-                await record_usage(
-                    tenant_id=tenant_id,
-                    request_id=request_id,
-                    provider=provider,
-                    model_requested=body.model,
-                    model_used=model_used,
-                    prompt_tokens=usage.prompt_tokens,
-                    completion_tokens=usage.completion_tokens,
-                    cost_usd=cost_usd(model_used, usage.prompt_tokens, usage.completion_tokens),
-                    latency_ms=now_ms() - started,
-                )
+            usage = Usage()
+            used = first
+            for idx, att in enumerate(plan.attempts):
+                used = att
+                upstream = {**base_upstream, "model": att.model}
+                sent = False
+                try:
+                    async for chunk in _service(att).stream(upstream, usage):
+                        sent = True
+                        yield chunk
+                    break  # sucesso
+                except (ProviderError, httpx.HTTPError) as exc:
+                    if sent or idx == len(plan.attempts) - 1:
+                        yield openai_error_chunk(f"{type(exc).__name__}: {str(exc)[:300]}")
+                        break
+                    # local não deu conta → escala para o próximo (hospedado)
+                    continue
+            model_used = usage.model or used.model
+            await record_usage(
+                tenant_id=tenant_id,
+                request_id=request_id,
+                provider=used.provider,
+                model_requested=body.model,
+                model_used=model_used,
+                prompt_tokens=usage.prompt_tokens,
+                completion_tokens=usage.completion_tokens,
+                cost_usd=cost_usd(model_used, usage.prompt_tokens, usage.completion_tokens),
+                cost_saved_usd=_saved(
+                    baseline, model_used, usage.prompt_tokens, usage.completion_tokens
+                ),
+                latency_ms=now_ms() - started,
+            )
 
         return StreamingResponse(
             event_stream(),
             media_type="text/event-stream",
-            headers={"x-nexus-request-id": request_id, "cache-control": "no-cache"},
+            headers={**headers_for(first, False), "cache-control": "no-cache"},
         )
 
-    # Resposta única
+    # ---------- resposta única ----------
     started = now_ms()
-    try:
-        result = await service.complete(upstream)
-    except ProviderError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Erro do provedor [{exc.status_code}]: {exc.message[:300]}",
-        ) from exc
+    last_exc: Exception | None = None
+    for idx, att in enumerate(plan.attempts):
+        try:
+            result = await _service(att).complete({**base_upstream, "model": att.model})
+        except (ProviderError, httpx.HTTPError) as exc:
+            last_exc = exc
+            continue  # local/primário não deu conta → tenta o próximo
+        model_used = result.usage.model or att.model
+        pt, ct = result.usage.prompt_tokens, result.usage.completion_tokens
+        await record_usage(
+            tenant_id=tenant_id,
+            request_id=request_id,
+            provider=att.provider,
+            model_requested=body.model,
+            model_used=model_used,
+            prompt_tokens=pt,
+            completion_tokens=ct,
+            cost_usd=cost_usd(model_used, pt, ct),
+            cost_saved_usd=_saved(baseline, model_used, pt, ct),
+            latency_ms=now_ms() - started,
+        )
+        payload = result.raw or {
+            "id": request_id,
+            "object": "chat.completion",
+            "model": result.model,
+            "choices": [
+                {"index": 0, "message": {"role": "assistant", "content": result.content},
+                 "finish_reason": "stop"}
+            ],
+            "usage": {
+                "prompt_tokens": result.usage.prompt_tokens,
+                "completion_tokens": result.usage.completion_tokens,
+            },
+        }
+        return JSONResponse(payload, headers=headers_for(att, escalated=idx > 0))
 
-    await record_usage(
-        tenant_id=tenant_id,
-        request_id=request_id,
-        provider=provider,
-        model_requested=body.model,
-        model_used=result.usage.model or body.model,
-        prompt_tokens=result.usage.prompt_tokens,
-        completion_tokens=result.usage.completion_tokens,
-        cost_usd=cost_usd(
-            result.usage.model or body.model,
-            result.usage.prompt_tokens,
-            result.usage.completion_tokens,
-        ),
-        latency_ms=now_ms() - started,
+    raise HTTPException(
+        status_code=status.HTTP_502_BAD_GATEWAY,
+        detail=f"Todos os provedores falharam. Último erro: {str(last_exc)[:300]}",
     )
-
-    payload = result.raw or {
-        "id": request_id,
-        "object": "chat.completion",
-        "model": result.model,
-        "choices": [
-            {"index": 0, "message": {"role": "assistant", "content": result.content},
-             "finish_reason": "stop"}
-        ],
-        "usage": {
-            "prompt_tokens": result.usage.prompt_tokens,
-            "completion_tokens": result.usage.completion_tokens,
-        },
-    }
-    return JSONResponse(payload, headers={"x-nexus-request-id": request_id})

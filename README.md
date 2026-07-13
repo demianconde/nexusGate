@@ -61,6 +61,7 @@ make dev                # uvicorn com reload
 **Proxy / plano de dados (auth `x-api-key: nxg_....`):**
 - `GET /v1/whoami` — resolve o tenant a partir da chave (após rate limit).
 - `POST /v1/chat/completions` — proxy compatível com o formato OpenAI. Resolve a credencial BYOK do tenant, chama o provedor real (qualquer LLM/local), faz streaming SSE (`stream: true`) e grava `usage_logs`. O provedor é inferido do modelo ou informado em `provider`.
+  - **`model: "nexus-auto"`** ativa o roteamento: classifica a complexidade e aplica **local-first com escalonamento** — tenta o provedor **local** primeiro (gratuito) e, se falhar, **escala** para o hospedado (o **premium** em tarefas complexas). Headers de resposta expõem a decisão: `x-nexus-model`, `x-nexus-provider`, `x-nexus-complexity`, `x-nexus-routed` (`auto`/`escalated`), `x-nexus-local`.
 
 > **Qualquer LLM, inclusive local:** cadastre uma credencial com `provider` conhecido (usa base_url padrão) ou `custom`/local com `base_url` própria (ex.: Ollama em `http://localhost:11434/v1`, sem API key). O painel detecta automaticamente se o endpoint é **local** e exibe o **modelo** configurado.
 
@@ -113,7 +114,7 @@ tests/                 # pytest
 - **F0 Fundação** ✅ scaffold, DB async + Alembic, /health, Docker, CI
 - **F1 Multi-tenant + Auth** ✅ Supabase real, provisionamento de tenants/users, CRUD de x-api-key, rate-limiting por tenant
 - **F2 Proxy BYOK real** ✅ envelope encryption (AES-256-GCM), CRUD de credenciais de provedor, `/v1/chat/completions` com streaming e gravação de uso. Suporta **qualquer LLM**: OpenAI-compatível (OpenAI, Qwen, Groq, DeepSeek, Together, OpenRouter, Gemini) e **locais** (Ollama, LM Studio, vLLM, LocalAI), além de Anthropic.
-- **F3 Roteamento + Economia** 🚧 catálogo de preços (60+ LLMs) + aba **Uso & Economia** (tokens/custo por LLM e comparação "se tudo rodasse no mesmo LLM") ✅; roteamento automático `nexus-auto` pendente
+- **F3 Roteamento + Economia** ✅ catálogo de preços (60+ LLMs), aba **Uso & Economia** (tokens/custo por LLM + comparação "se tudo rodasse no mesmo LLM") e **`nexus-auto`**: roteamento por complexidade **local-first com escalonamento** (local primeiro; se não der conta, escala para o pago), com `cost_saved` gravado
 - **F4 Cache semântico real** — embeddings (fastembed) + Redis vetorial
 - **F5 Billing** — Stripe metered, planos, webhooks
 - **F6 Hardening / GA** — observabilidade, retries, security review

@@ -439,15 +439,20 @@
                 let cfg;
                 try { cfg = await (await fetch('/public-config')).json(); } catch (e) { cfg = { configured: false }; }
 
-                if (cfg.configured) {
-                    client = window.supabase.createClient(cfg.supabase_url, cfg.supabase_anon_key);
-                    const { data } = await client.auth.getSession();  // também captura sessão vinda de link mágico
-                    if (data.session) {
-                        token = data.session.access_token;
-                        localStorage.setItem('nexus_token', token);
-                    }
+                token = localStorage.getItem('nexus_token');
+                const isDev = cfg.dev_mode && cfg.dev_token && token === cfg.dev_token;
+
+                // Modo dev: não toca no Supabase (funciona 100% offline).
+                if (cfg.configured && !isDev) {
+                    try {
+                        client = window.supabase.createClient(cfg.supabase_url, cfg.supabase_anon_key);
+                        const { data } = await client.auth.getSession();  // captura sessão de link mágico
+                        if (data.session) {
+                            token = data.session.access_token;
+                            localStorage.setItem('nexus_token', token);
+                        }
+                    } catch (e) { /* offline / sem sessão — segue com token local se houver */ }
                 }
-                if (!token) token = localStorage.getItem('nexus_token');
                 if (!token) { goLogin(); return; }
 
                 try {

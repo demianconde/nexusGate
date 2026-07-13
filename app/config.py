@@ -40,6 +40,13 @@ class Settings(BaseSettings):
     # Envelope encryption (Fase 2)
     master_key: str | None = Field(default=None, alias="NEXUS_MASTER_KEY")
 
+    # Cache semântico (Fase 4)
+    cache_enabled: bool = Field(default=True, alias="NEXUS_CACHE_ENABLED")
+    cache_threshold: float = Field(default=0.92, alias="NEXUS_CACHE_THRESHOLD")
+    cache_ttl_seconds: int = Field(default=7 * 24 * 3600, alias="NEXUS_CACHE_TTL")
+    embed_url: str = Field(default="http://localhost:11434", alias="NEXUS_EMBED_URL")
+    embed_model: str | None = Field(default=None, alias="NEXUS_EMBED_MODEL")
+
     # Stripe (Fase 5)
     stripe_secret_key: str | None = Field(default=None, alias="STRIPE_SECRET_KEY")
     stripe_webhook_secret: str | None = Field(default=None, alias="STRIPE_WEBHOOK_SECRET")

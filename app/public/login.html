@@ -93,14 +93,19 @@
                     magicLinkBtn.disabled = true;
                     return;
                 }
-                client = window.supabase.createClient(cfg.supabase_url, cfg.supabase_anon_key);
-
-                // Já logado? Vai direto ao dashboard.
-                const { data } = await client.auth.getSession();
-                if (data.session) {
-                    localStorage.setItem('nexus_token', data.session.access_token);
+                // Se já entrou em modo dev antes, não precisa do Supabase (offline-safe).
+                if (cfg.dev_token && localStorage.getItem('nexus_token') === cfg.dev_token) {
                     window.location.href = '/dashboard';
+                    return;
                 }
+                try {
+                    client = window.supabase.createClient(cfg.supabase_url, cfg.supabase_anon_key);
+                    const { data } = await client.auth.getSession();  // já logado? vai direto
+                    if (data.session) {
+                        localStorage.setItem('nexus_token', data.session.access_token);
+                        window.location.href = '/dashboard';
+                    }
+                } catch (e) { /* offline / sem sessão — usa o botão de dev ou login por e-mail */ }
             }
 
             function setMode(next) {

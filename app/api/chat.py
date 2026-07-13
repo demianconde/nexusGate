@@ -7,6 +7,7 @@ provedor real (qualquer LLM/local), faz streaming SSE e grava o uso (com economi
 
 from __future__ import annotations
 
+import json
 import uuid
 from dataclasses import dataclass, field
 
@@ -17,6 +18,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.api_key import get_api_tenant
+from app.cache import CachedResponse, get_cache
+from app.cache.semantic import prompt_text
 from app.crypto import decrypt_secret
 from app.db.models import ProviderKey, Tenant
 from app.db.session import get_db
@@ -119,6 +122,21 @@ def _saved(baseline_model: str | None, model: str, pt: int, ct: int) -> float:
     return max(0.0, cost_usd(baseline_model, pt, ct) - cost_usd(model, pt, ct))
 
 
+def _delta_content(chunk: bytes) -> str:
+    """Extrai o texto de um chunk SSE 'data: {...}' (para acumular no cache)."""
+    line = chunk.decode("utf-8", "replace").strip()
+    if not line.startswith("data: "):
+        return ""
+    payload = line[6:].strip()
+    if payload == "[DONE]":
+        return ""
+    try:
+        obj = json.loads(payload)
+        return (obj.get("choices") or [{}])[0].get("delta", {}).get("content") or ""
+    except (json.JSONDecodeError, IndexError, AttributeError):
+        return ""
+
+
 @router.post("/chat/completions")
 async def chat_completions(
     body: ChatCompletionRequest,
@@ -135,12 +153,72 @@ async def chat_completions(
     request_id = uuid.uuid4().hex
     tenant_id = tenant.id
     baseline = plan.baseline_model
+    cache = get_cache()
+    cache_text = prompt_text(base_upstream["messages"])
+
+    # ---------- cache semântico: tenta servir sem chamar o provedor ----------
+    cached = await cache.get(str(tenant_id), cache_text)
+    if cached is not None:
+        await record_usage(
+            tenant_id=tenant_id,
+            request_id=request_id,
+            provider=cached.provider,
+            model_requested=body.model,
+            model_used=cached.model,
+            prompt_tokens=cached.prompt_tokens,
+            completion_tokens=cached.completion_tokens,
+            cost_usd=0.0,
+            cost_saved_usd=cost_usd(cached.model, cached.prompt_tokens, cached.completion_tokens),
+            cache_hit=True,
+            latency_ms=0,
+        )
+        ch = {
+            "x-nexus-request-id": request_id,
+            "x-nexus-model": cached.model,
+            "x-nexus-provider": cached.provider,
+            "x-nexus-cache": "hit",
+        }
+        if body.stream:
+
+            async def cached_stream():
+                chunk = {
+                    "choices": [
+                        {"index": 0, "delta": {"role": "assistant", "content": cached.content}}
+                    ],
+                    "model": cached.model,
+                }
+                yield f"data: {json.dumps(chunk)}\n\n".encode()
+                done = {"choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}]}
+                yield f"data: {json.dumps(done)}\n\n".encode()
+                yield b"data: [DONE]\n\n"
+
+            return StreamingResponse(
+                cached_stream(),
+                media_type="text/event-stream",
+                headers={**ch, "cache-control": "no-cache"},
+            )
+        payload = {
+            "id": request_id,
+            "object": "chat.completion",
+            "model": cached.model,
+            "choices": [
+                {"index": 0, "message": {"role": "assistant", "content": cached.content},
+                 "finish_reason": "stop"}
+            ],
+            "usage": {
+                "prompt_tokens": cached.prompt_tokens,
+                "completion_tokens": cached.completion_tokens,
+                "total_tokens": cached.prompt_tokens + cached.completion_tokens,
+            },
+        }
+        return JSONResponse(payload, headers=ch)
 
     def headers_for(att: Attempt, escalated: bool) -> dict:
         h = {
             "x-nexus-request-id": request_id,
             "x-nexus-model": att.model,
             "x-nexus-provider": att.provider,
+            "x-nexus-cache": "miss",
         }
         if plan.routed:
             h["x-nexus-complexity"] = plan.complexity or ""
@@ -156,6 +234,8 @@ async def chat_completions(
             started = now_ms()
             usage = Usage()
             used = first
+            collected: list[str] = []
+            ok = False
             for idx, att in enumerate(plan.attempts):
                 used = att
                 upstream = {**base_upstream, "model": att.model}
@@ -163,7 +243,9 @@ async def chat_completions(
                 try:
                     async for chunk in _service(att).stream(upstream, usage):
                         sent = True
+                        collected.append(_delta_content(chunk))
                         yield chunk
+                    ok = True
                     break  # sucesso
                 except (ProviderError, httpx.HTTPError) as exc:
                     if sent or idx == len(plan.attempts) - 1:
@@ -172,6 +254,19 @@ async def chat_completions(
                     # local não deu conta → escala para o próximo (hospedado)
                     continue
             model_used = usage.model or used.model
+            if ok:
+                content = "".join(collected)
+                await cache.put(
+                    str(tenant_id),
+                    cache_text,
+                    CachedResponse(
+                        content=content,
+                        model=model_used,
+                        provider=used.provider,
+                        prompt_tokens=usage.prompt_tokens,
+                        completion_tokens=usage.completion_tokens,
+                    ),
+                )
             await record_usage(
                 tenant_id=tenant_id,
                 request_id=request_id,
@@ -234,6 +329,17 @@ async def chat_completions(
                     "total_tokens": result.usage.prompt_tokens + result.usage.completion_tokens,
                 },
             }
+        await cache.put(
+            str(tenant_id),
+            cache_text,
+            CachedResponse(
+                content=result.content,
+                model=model_used,
+                provider=att.provider,
+                prompt_tokens=pt,
+                completion_tokens=ct,
+            ),
+        )
         return JSONResponse(payload, headers=headers_for(att, escalated=idx > 0))
 
     raise HTTPException(

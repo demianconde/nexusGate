@@ -117,9 +117,10 @@ tests/                 # pytest
 - **F1 Multi-tenant + Auth** ✅ Supabase real, provisionamento de tenants/users, CRUD de x-api-key, rate-limiting por tenant
 - **F2 Proxy BYOK real** ✅ envelope encryption (AES-256-GCM), CRUD de credenciais de provedor, `/v1/chat/completions` com streaming e gravação de uso. Suporta **qualquer LLM**: OpenAI-compatível (OpenAI, Qwen, Groq, DeepSeek, Together, OpenRouter, Gemini) e **locais** (Ollama, LM Studio, vLLM, LocalAI), além de Anthropic.
 - **F3 Roteamento + Economia** ✅ catálogo de preços (60+ LLMs), aba **Uso & Economia** (tokens/custo por LLM + comparação "se tudo rodasse no mesmo LLM") e **`nexus-auto`**: roteamento por complexidade **local-first com escalonamento** (local primeiro; se não der conta, escala para o pago), com `cost_saved` gravado
-- **F4 Cache semântico real** — embeddings (fastembed) + Redis vetorial
-- **F5 Billing** — Stripe metered, planos, webhooks
-- **F6 Hardening / GA** — observabilidade, retries, security review
+- **F4 Cache semântico real** ✅ embeddings locais (Ollama) + store vetorial por tenant; serve prompts similares sem chamar o provedor (`x-nexus-cache: hit`) e contabiliza a economia
+- **F5 Billing** ✅ planos em BRL (quotas mensais + rpm por plano), aba **Plano & Cobrança**, checkout Stripe com **Pix/boleto/cartão** (opcional, atrás de chave) + modo dev
+- **F6 Hardening** ✅ redação de PII (LGPD) + guardrail para provedores hospedados, `/metrics` (Prometheus), retries em erros transitórios
+- **Deploy / GA** 🚧 ver [DEPLOY.md](DEPLOY.md) — cache vetorial em Redis, cloud KMS, testes de carga, Pix em produção
 
 ## Segurança
 - Nunca comitar `.env` nem segredos. Chaves BYOK são criptografadas at-rest (envelope encryption, Fase 2).

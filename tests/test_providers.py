@@ -47,3 +47,14 @@ def test_cost_usd_known_and_unknown():
     # 1M input @ 2.5 + 1M output @ 10 = 12.5
     assert cost_usd("gpt-4o", 1_000_000, 1_000_000) == 12.5
     assert cost_usd("modelo-local-qualquer", 1000, 1000) == 0.0
+
+
+def test_longest_prefix_match():
+    from app.routing.pricing import price_of
+
+    # "gpt-4o-mini" deve casar com o preço do mini, não com "gpt-4o" nem "gpt-4"
+    assert price_of("gpt-4o-mini") == (0.15, 0.60)
+    # nome datado cai no modelo base
+    assert price_of("gpt-4o-2024-08-06") == (2.50, 10.00)
+    # tolera prefixo "models/" (Gemini)
+    assert price_of("models/gemini-2.5-flash") == price_of("gemini-2.5-flash")

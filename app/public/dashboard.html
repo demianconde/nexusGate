@@ -31,6 +31,12 @@
                 </div>
             </div>
 
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="painel">Chaves &amp; Credenciais</button>
+                <button class="tab-btn" data-tab="uso">Uso &amp; Economia</button>
+            </div>
+
+            <div id="tab-painel">
             <div class="stat-grid" id="stats" style="display:none">
                 <div class="stat glass"><div class="k">Plano</div><div class="v" id="statPlan">—</div></div>
                 <div class="stat glass"><div class="k">Papel</div><div class="v" id="statRole">—</div></div>
@@ -89,6 +95,33 @@
                     <div class="empty">Carregando credenciais…</div>
                 </div>
             </div>
+            </div><!-- /tab-painel -->
+
+            <div id="tab-uso" style="display:none">
+                <div class="stat-grid">
+                    <div class="stat glass"><div class="k">Requisições</div><div class="v" id="uRequests">—</div></div>
+                    <div class="stat glass"><div class="k">Tokens totais</div><div class="v" id="uTokens">—</div></div>
+                    <div class="stat glass"><div class="k">Custo real (BYOK)</div><div class="v" id="uCost">—</div></div>
+                </div>
+
+                <div class="compare">
+                    <div class="row-inline">
+                        <label for="baselineSelect">Simular: e se <strong>tudo</strong> tivesse rodado no mesmo LLM →</label>
+                        <select class="input" id="baselineSelect" style="max-width:280px"></select>
+                    </div>
+                    <div class="compare-grid">
+                        <div class="cell"><div class="k">Custo real (roteado)</div><div class="v" id="cReal">—</div></div>
+                        <div class="cell"><div class="k">Custo no LLM único</div><div class="v" id="cBaseline">—</div></div>
+                        <div class="cell win"><div class="k">Economia</div><div class="v" id="cSaved">—</div><div class="pct" id="cSavedPct"></div></div>
+                    </div>
+                    <p class="muted" style="font-size:0.75rem;margin-top:1rem">Custos em USD por 1M tokens (catálogo de referência). O "custo real" recomputa pelos preços atuais; o comparativo aplica o preço do LLM escolhido a todos os tokens.</p>
+                </div>
+
+                <div class="panel glass">
+                    <div class="panel-head"><h2>Consumo por LLM</h2></div>
+                    <div id="usageContainer"><div class="empty">Carregando uso…</div></div>
+                </div>
+            </div><!-- /tab-uso -->
         </div>
     </main>
 
@@ -111,6 +144,15 @@
             const providerModel = document.getElementById('providerModel');
             const providerBtn = document.getElementById('providerBtn');
             const providersContainer = document.getElementById('providersContainer');
+            const uRequests = document.getElementById('uRequests');
+            const uTokens = document.getElementById('uTokens');
+            const uCost = document.getElementById('uCost');
+            const baselineSelect = document.getElementById('baselineSelect');
+            const cReal = document.getElementById('cReal');
+            const cBaseline = document.getElementById('cBaseline');
+            const cSaved = document.getElementById('cSaved');
+            const cSavedPct = document.getElementById('cSavedPct');
+            const usageContainer = document.getElementById('usageContainer');
 
             let client = null;
             let token = null;
@@ -299,6 +341,90 @@
                     await loadProviderKeys();
                 } catch (err) { showMsg(err.message, 'error'); }
             }
+
+            // ----- Uso & Economia -----
+            let pricingCatalog = [];
+            let usageData = null;
+
+            function fmtUsd(n) {
+                return (n || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 6 });
+            }
+            function fmtInt(n) { return (n || 0).toLocaleString('pt-BR'); }
+
+            async function loadPricing() {
+                const res = await api('/v1/admin/pricing');
+                if (!res.ok) return;
+                pricingCatalog = (await res.json()).catalog || [];
+                baselineSelect.innerHTML = pricingCatalog.map(p =>
+                    '<option value="' + p.model + '">' + escapeHtml(p.model)
+                    + ' — $' + p.input_per_mtok + '/$' + p.output_per_mtok + ' por Mtok</option>').join('');
+                // default: gpt-4o se existir
+                const def = pricingCatalog.find(p => p.model === 'gpt-4o');
+                if (def) baselineSelect.value = 'gpt-4o';
+            }
+
+            async function loadUsage() {
+                const res = await api('/v1/admin/usage/summary');
+                if (!res.ok) throw new Error('falha ao carregar uso');
+                usageData = await res.json();
+                const t = usageData.totals;
+                uRequests.textContent = fmtInt(t.requests);
+                uTokens.textContent = fmtInt(t.total_tokens);
+                uCost.textContent = fmtUsd(t.cost_usd);
+
+                if (!usageData.per_model.length) {
+                    usageContainer.innerHTML = '<div class="empty">Ainda não há uso registrado. Faça uma chamada em /v1/chat/completions.</div>';
+                    updateComparison();
+                    return;
+                }
+                let html = '<table class="table"><thead><tr><th>Provedor</th><th>Modelo</th><th class="num">Reqs</th><th class="num">Prompt</th><th class="num">Completion</th><th class="num">Custo</th></tr></thead><tbody>';
+                for (const m of usageData.per_model) {
+                    html += '<tr>'
+                        + '<td>' + escapeHtml(m.provider) + '</td>'
+                        + '<td class="mono" style="font-size:0.82rem">' + escapeHtml(m.model) + (m.priced ? '' : ' <span class="text-mono-mut">(sem preço)</span>') + '</td>'
+                        + '<td class="num">' + fmtInt(m.requests) + '</td>'
+                        + '<td class="num">' + fmtInt(m.prompt_tokens) + '</td>'
+                        + '<td class="num">' + fmtInt(m.completion_tokens) + '</td>'
+                        + '<td class="num">' + fmtUsd(m.cost_usd) + '</td>'
+                        + '</tr>';
+                }
+                html += '</tbody></table>';
+                usageContainer.innerHTML = html;
+                updateComparison();
+            }
+
+            function updateComparison() {
+                if (!usageData) return;
+                const t = usageData.totals;
+                const p = pricingCatalog.find(x => x.model === baselineSelect.value);
+                const real = t.cost_usd;
+                cReal.textContent = fmtUsd(real);
+                if (!p) { cBaseline.textContent = '—'; cSaved.textContent = '—'; cSavedPct.textContent = ''; return; }
+                const baseline = (t.prompt_tokens * p.input_per_mtok + t.completion_tokens * p.output_per_mtok) / 1e6;
+                const saved = baseline - real;
+                cBaseline.textContent = fmtUsd(baseline);
+                cSaved.textContent = fmtUsd(saved);
+                cSavedPct.textContent = baseline > 0 ? (saved >= 0 ? '−' : '+') + Math.abs(saved / baseline * 100).toFixed(1) + '% vs LLM único' : '';
+            }
+            baselineSelect.addEventListener('change', updateComparison);
+
+            // ----- Abas -----
+            let usageLoaded = false;
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const tab = btn.getAttribute('data-tab');
+                    document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+                    document.getElementById('tab-painel').style.display = tab === 'painel' ? '' : 'none';
+                    document.getElementById('tab-uso').style.display = tab === 'uso' ? '' : 'none';
+                    if (tab === 'uso') {
+                        try {
+                            if (!pricingCatalog.length) await loadPricing();
+                            await loadUsage();
+                            usageLoaded = true;
+                        } catch (err) { showMsg(err.message, 'error'); }
+                    }
+                });
+            });
 
             logoutBtn.addEventListener('click', async () => {
                 try { if (client) await client.auth.signOut(); } catch (e) { /* ignore */ }

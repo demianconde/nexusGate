@@ -113,7 +113,7 @@ tests/                 # pytest
 - **F0 Fundação** ✅ scaffold, DB async + Alembic, /health, Docker, CI
 - **F1 Multi-tenant + Auth** ✅ Supabase real, provisionamento de tenants/users, CRUD de x-api-key, rate-limiting por tenant
 - **F2 Proxy BYOK real** ✅ envelope encryption (AES-256-GCM), CRUD de credenciais de provedor, `/v1/chat/completions` com streaming e gravação de uso. Suporta **qualquer LLM**: OpenAI-compatível (OpenAI, Qwen, Groq, DeepSeek, Together, OpenRouter, Gemini) e **locais** (Ollama, LM Studio, vLLM, LocalAI), além de Anthropic.
-- **F3 Roteamento + Economia** — router de custo, dashboard de economia
+- **F3 Roteamento + Economia** 🚧 catálogo de preços (60+ LLMs) + aba **Uso & Economia** (tokens/custo por LLM e comparação "se tudo rodasse no mesmo LLM") ✅; roteamento automático `nexus-auto` pendente
 - **F4 Cache semântico real** — embeddings (fastembed) + Redis vetorial
 - **F5 Billing** — Stripe metered, planos, webhooks
 - **F6 Hardening / GA** — observabilidade, retries, security review

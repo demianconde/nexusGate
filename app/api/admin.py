@@ -1,0 +1,82 @@
+"""Endpoints do painel (auth Supabase): perfil e gestão de chaves de API."""
+
+from __future__ import annotations
+
+import uuid
+
+from fastapi import APIRouter, Depends, HTTPException, Response, status
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.auth.api_key import generate_api_key
+from app.auth.supabase import get_current_user
+from app.db.models import NexusApiKey, Tenant, User
+from app.db.session import get_db
+
+from .schemas import ApiKeyCreate, ApiKeyCreated, ApiKeyInfo, MeResponse
+
+router = APIRouter(prefix="/v1/admin", tags=["admin"])
+
+
+@router.get("/me", response_model=MeResponse)
+async def me(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> MeResponse:
+    tenant = await db.get(Tenant, user.tenant_id)
+    return MeResponse(
+        user_id=user.id, tenant_id=user.tenant_id, role=user.role, plan=tenant.plan
+    )
+
+
+@router.get("/keys", response_model=list[ApiKeyInfo])
+async def list_keys(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> list[ApiKeyInfo]:
+    result = await db.execute(
+        select(NexusApiKey)
+        .where(NexusApiKey.tenant_id == user.tenant_id)
+        .order_by(NexusApiKey.created_at.desc())
+    )
+    return [ApiKeyInfo.model_validate(k) for k in result.scalars().all()]
+
+
+@router.post("/keys", response_model=ApiKeyCreated, status_code=status.HTTP_201_CREATED)
+async def create_key(
+    body: ApiKeyCreate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> ApiKeyCreated:
+    full_key, prefix, key_hash = generate_api_key()
+    record = NexusApiKey(
+        tenant_id=user.tenant_id, key_prefix=prefix, key_hash=key_hash, name=body.name
+    )
+    db.add(record)
+    await db.commit()
+    await db.refresh(record)
+
+    # api_key em claro é retornada só aqui, na criação.
+    return ApiKeyCreated(
+        id=record.id,
+        key_prefix=record.key_prefix,
+        name=record.name,
+        created_at=record.created_at,
+        revoked_at=record.revoked_at,
+        api_key=full_key,
+    )
+
+
+@router.delete("/keys/{key_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
+async def revoke_key(
+    key_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    record = await db.get(NexusApiKey, key_id)
+    if record is None or record.tenant_id != user.tenant_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chave não encontrada")
+    if record.revoked_at is None:
+        record.revoked_at = func.now()
+        await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

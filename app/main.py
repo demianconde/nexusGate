@@ -10,7 +10,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
-from app.api import health
+from app.api import admin, health, proxy
 from app.config import get_settings
 from app.logging_config import configure_logging, get_logger
 
@@ -53,6 +53,8 @@ def create_app() -> FastAPI:
         return response
 
     app.include_router(health.router)
+    app.include_router(admin.router)
+    app.include_router(proxy.router)
     return app
 
 

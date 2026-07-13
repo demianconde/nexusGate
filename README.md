@@ -44,21 +44,37 @@ make dev                # uvicorn com reload
 - `make revision m="mensagem"` — gera nova migration (autogenerate)
 - `make lint` / `make test` — ruff / pytest
 
+## API
+
+**Painel (auth Supabase — `Authorization: Bearer <jwt>`):**
+- `GET /v1/admin/me` — perfil do usuário + tenant
+- `GET /v1/admin/keys` — lista as chaves de API do tenant
+- `POST /v1/admin/keys` `{ "name": "..." }` — cria chave (retorna o valor em claro **só aqui**)
+- `DELETE /v1/admin/keys/{id}` — revoga a chave
+
+**Proxy / plano de dados (auth `x-api-key: nxg_....`):**
+- `GET /v1/whoami` — resolve o tenant a partir da chave (após rate limit). O `/v1/chat/completions` real chega na Fase 2.
+
+Rate limiting por tenant (janela de 1 min): free=60, pro=600, enterprise=6000 req/min.
+
 ## Estrutura
 ```
 app/
   config.py            # settings (pydantic-settings)
   logging_config.py    # logging estruturado (sem PII/segredos)
   main.py              # app factory FastAPI + middleware de request_id
+  redis_client.py      # conexão Redis compartilhada
+  ratelimit.py         # rate limiting por tenant
+  auth/                # supabase (painel) + api_key (proxy) + parsing de token
   db/                  # engine async, sessão e modelos ORM
-  api/                 # rotas (health; demais nas próximas fases)
+  api/                 # rotas: health, admin (painel), proxy (dados)
 alembic/               # migrations
 tests/                 # pytest
 ```
 
 ## Roadmap (fases)
 - **F0 Fundação** ✅ scaffold, DB async + Alembic, /health, Docker, CI
-- **F1 Multi-tenant + Auth** — Supabase real, tenants/users, x-api-key, rate-limiting
+- **F1 Multi-tenant + Auth** ✅ Supabase real, provisionamento de tenants/users, CRUD de x-api-key, rate-limiting por tenant
 - **F2 Proxy BYOK real** — envelope encryption, chamadas reais com streaming
 - **F3 Roteamento + Economia** — router de custo, dashboard de economia
 - **F4 Cache semântico real** — embeddings (fastembed) + Redis vetorial

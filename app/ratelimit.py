@@ -7,40 +7,47 @@ import time
 from fastapi import HTTPException, status
 from redis.exceptions import RedisError
 
+from app.billing.plans import get_plan
 from app.logging_config import get_logger
 from app.redis_client import get_redis
 
 _log = get_logger("ratelimit")
 
-# Requisições por minuto por plano.
-PLAN_LIMITS: dict[str, int] = {
-    "free": 60,
-    "pro": 600,
-    "enterprise": 6000,
-}
-
 _WINDOW_SECONDS = 60
 
 
 async def enforce_rate_limit(tenant_id: str, plan: str) -> None:
-    """Incrementa o contador do tenant na janela atual e bloqueia se exceder o plano."""
-    limit = PLAN_LIMITS.get(plan, PLAN_LIMITS["free"])
-    window = int(time.time()) // _WINDOW_SECONDS
-    key = f"rl:{tenant_id}:{window}"
+    """Rate limit por minuto (do plano) + quota mensal. Fail-open sem Redis."""
+    spec = get_plan(plan)
+    now = int(time.time())
+    minute_key = f"rl:{tenant_id}:{now // _WINDOW_SECONDS}"
 
     try:
         redis = get_redis()
-        count = await redis.incr(key)
+        count = await redis.incr(minute_key)
         if count == 1:
-            await redis.expire(key, _WINDOW_SECONDS)
+            await redis.expire(minute_key, _WINDOW_SECONDS)
     except RedisError as exc:
-        # Fail-open: sem Redis, não bloqueia (evita derrubar o proxy). Loga o incidente.
         _log.warning("rate_limit_unavailable", error=str(exc))
         return
 
-    if count > limit:
+    if count > spec.rpm:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Limite de requisições do plano excedido",
+            detail="Limite de requisições por minuto do plano excedido",
             headers={"Retry-After": str(_WINDOW_SECONDS)},
+        )
+
+    # Quota mensal (janela de ~31 dias).
+    month_key = f"quota:{tenant_id}:{time.strftime('%Y%m', time.gmtime(now))}"
+    try:
+        used = await redis.incr(month_key)
+        if used == 1:
+            await redis.expire(month_key, 31 * 24 * 3600)
+    except RedisError:
+        return
+    if used > spec.monthly_quota:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail=f"Quota mensal do plano '{spec.label}' excedida. Faça upgrade.",
         )

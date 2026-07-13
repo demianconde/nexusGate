@@ -34,6 +34,7 @@
             <div class="tabs">
                 <button class="tab-btn active" data-tab="painel">Chaves &amp; Credenciais</button>
                 <button class="tab-btn" data-tab="uso">Uso &amp; Economia</button>
+                <button class="tab-btn" data-tab="cobranca">Plano &amp; Cobrança</button>
             </div>
 
             <div id="tab-painel">
@@ -123,6 +124,16 @@
                     <div id="usageContainer"><div class="empty">Carregando uso…</div></div>
                 </div>
             </div><!-- /tab-uso -->
+
+            <div id="tab-cobranca" style="display:none">
+                <div class="stat-grid">
+                    <div class="stat glass"><div class="k">Plano atual</div><div class="v" id="bPlan">—</div></div>
+                    <div class="stat glass"><div class="k">Requisições no mês</div><div class="v" id="bUsed">—</div></div>
+                    <div class="stat glass"><div class="k">Quota mensal</div><div class="v" id="bQuota">—</div></div>
+                </div>
+                <p class="muted" id="bMode" style="font-size:0.8rem;margin-bottom:1rem"></p>
+                <div class="grid grid-pricing" id="plansContainer"></div>
+            </div><!-- /tab-cobranca -->
         </div>
     </main>
 
@@ -411,21 +422,63 @@
             }
             baselineSelect.addEventListener('change', updateComparison);
 
+            // ----- Cobrança -----
+            async function loadBilling() {
+                const res = await api('/v1/admin/billing');
+                if (!res.ok) throw new Error('falha ao carregar cobrança');
+                const b = await res.json();
+                document.getElementById('bPlan').textContent = b.plan_label;
+                document.getElementById('bUsed').textContent = fmtInt(b.used_this_month);
+                document.getElementById('bQuota').textContent = fmtInt(b.monthly_quota);
+                document.getElementById('bMode').textContent = b.stripe_enabled
+                    ? 'Pagamento via Stripe (Pix, boleto ou cartão).'
+                    : 'Modo dev: a troca de plano é aplicada direto, sem cobrança.';
+                const cont = document.getElementById('plansContainer');
+                cont.innerHTML = b.plans.map(p => {
+                    const current = p.key === b.plan;
+                    const feats = p.features.map(f => '<li>' + escapeHtml(f) + '</li>').join('');
+                    return '<div class="plan glass' + (current ? ' featured' : '') + '">'
+                        + (current ? '<span class="tag">Atual</span>' : '')
+                        + '<h3>' + escapeHtml(p.label) + '</h3>'
+                        + '<div class="price"><span class="amt">R$ ' + fmtInt(p.price_brl) + '</span><span class="per">/mês</span></div>'
+                        + '<ul><li>' + fmtInt(p.rpm) + ' req/min</li><li>' + fmtInt(p.monthly_quota) + ' req/mês</li>' + feats + '</ul>'
+                        + (current ? '<button class="btn btn-outline" disabled>Plano atual</button>'
+                                   : '<button class="btn btn-primary" data-plan="' + p.key + '">Escolher</button>')
+                        + '</div>';
+                }).join('');
+                cont.querySelectorAll('[data-plan]').forEach(btn => {
+                    btn.addEventListener('click', () => changePlan(btn.getAttribute('data-plan')));
+                });
+            }
+
+            async function changePlan(plan) {
+                clearMsg();
+                try {
+                    const res = await api('/v1/admin/billing/plan', { method: 'POST', body: JSON.stringify({ plan }) });
+                    if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.detail || 'falha'); }
+                    const r = await res.json();
+                    if (r.status === 'checkout' && r.checkout_url) { window.location.href = r.checkout_url; return; }
+                    showMsg('Plano atualizado para ' + plan + '.', 'ok');
+                    await loadBilling();
+                } catch (err) { showMsg(err.message, 'error'); }
+            }
+
             // ----- Abas -----
-            let usageLoaded = false;
             document.querySelectorAll('.tab-btn').forEach(btn => {
                 btn.addEventListener('click', async () => {
                     const tab = btn.getAttribute('data-tab');
                     document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b === btn));
                     document.getElementById('tab-painel').style.display = tab === 'painel' ? '' : 'none';
                     document.getElementById('tab-uso').style.display = tab === 'uso' ? '' : 'none';
-                    if (tab === 'uso') {
-                        try {
+                    document.getElementById('tab-cobranca').style.display = tab === 'cobranca' ? '' : 'none';
+                    try {
+                        if (tab === 'uso') {
                             if (!pricingCatalog.length) await loadPricing();
                             await loadUsage();
-                            usageLoaded = true;
-                        } catch (err) { showMsg(err.message, 'error'); }
-                    }
+                        } else if (tab === 'cobranca') {
+                            await loadBilling();
+                        }
+                    } catch (err) { showMsg(err.message, 'error'); }
                 });
             });
 

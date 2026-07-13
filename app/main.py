@@ -41,10 +41,12 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    # Em produção, use uma allowlist (NEXUS_CORS_ORIGINS). Em dev, libera tudo.
+    cors_origins = settings.cors_origin_list if settings.is_production else ["*"]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"] if not settings.is_production else [],
-        allow_credentials=True,
+        allow_origins=cors_origins,
+        allow_credentials=cors_origins != ["*"],  # credenciais não combinam com "*"
         allow_methods=["*"],
         allow_headers=["*"],
     )
@@ -80,7 +82,12 @@ def create_app() -> FastAPI:
         return FileResponse(PUBLIC_DIR / "dashboard.html")
 
     @app.get("/metrics", include_in_schema=False)
-    async def metrics() -> PlainTextResponse:
+    async def metrics(request: Request) -> PlainTextResponse:
+        token = settings.metrics_token
+        if token:
+            auth = request.headers.get("authorization", "")
+            if auth != f"Bearer {token}":
+                return PlainTextResponse("unauthorized", status_code=401)
         return PlainTextResponse(render_prometheus())
 
     @app.get("/public-config", include_in_schema=False)

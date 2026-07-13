@@ -9,10 +9,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.supabase import get_current_user
+from app.config import get_settings
 from app.crypto import encrypt_secret, is_configured
 from app.db.models import ProviderKey, User
 from app.db.session import get_db
 from app.providers.registry import KNOWN_PROVIDERS, is_local_url, resolve_endpoint
+from app.security.net import validate_endpoint
 
 from .schemas import ProviderKeyCreate, ProviderKeyInfo
 
@@ -81,6 +83,12 @@ async def create_provider_key(
     # Valida provedor/base_url/format.
     try:
         fmt, base_url = resolve_endpoint(body.provider, body.format, body.base_url)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    # Anti-SSRF: bloqueia endpoints em rede privada/local (salvo self-host).
+    try:
+        validate_endpoint(base_url, get_settings().allow_private_endpoints)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 

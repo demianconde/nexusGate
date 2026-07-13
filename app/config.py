@@ -42,6 +42,14 @@ class Settings(BaseSettings):
 
     # Segurança (Fase 6): redige PII antes de enviar a provedores hospedados.
     pii_guard: bool = Field(default=False, alias="NEXUS_PII_GUARD")
+    # Permite endpoints de provedor em rede privada/local (self-host). Em SaaS: false.
+    allow_private_endpoints: bool = Field(default=False, alias="NEXUS_ALLOW_PRIVATE_ENDPOINTS")
+    # Rate limit / quota: se true, bloqueia quando o Redis está indisponível (fail-closed).
+    ratelimit_fail_closed: bool = Field(default=False, alias="NEXUS_RATELIMIT_FAIL_CLOSED")
+    # CORS: origens permitidas em produção (separadas por vírgula).
+    cors_origins: str = Field(default="", alias="NEXUS_CORS_ORIGINS")
+    # Token opcional para proteger /metrics.
+    metrics_token: str | None = Field(default=None, alias="NEXUS_METRICS_TOKEN")
 
     # Cache semântico (Fase 4)
     cache_enabled: bool = Field(default=True, alias="NEXUS_CACHE_ENABLED")
@@ -62,6 +70,10 @@ class Settings(BaseSettings):
     def dev_bypass_enabled(self) -> bool:
         """Bypass de login só vale em dev — jamais em produção."""
         return self.dev_mode and not self.is_production
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
 
 @lru_cache

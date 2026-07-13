@@ -17,6 +17,10 @@ from app.db.session import get_db
 
 from .tokens import extract_bearer
 
+# Token sentinela do modo dev (só aceito quando dev_bypass_enabled é True).
+DEV_ACCESS_TOKEN = "dev-local-access"
+_DEV_SUPABASE_USER = {"id": "dev-local-user", "email": "dev@nexusgate.local"}
+
 
 async def verify_supabase_token(token: str) -> dict:
     """Valida o token contra o Supabase e retorna o objeto de usuário (id, email...)."""
@@ -83,5 +87,10 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authorization Bearer token é obrigatório",
         )
+
+    # Bypass de desenvolvimento: acessa o painel sem Supabase (só fora de produção).
+    if get_settings().dev_bypass_enabled and token == DEV_ACCESS_TOKEN:
+        return await _get_or_create_user(db, _DEV_SUPABASE_USER)
+
     supabase_user = await verify_supabase_token(token)
     return await _get_or_create_user(db, supabase_user)

@@ -76,6 +76,17 @@ SUPABASE_ANON_KEY=eyJ...   # anon public (não a service_role)
 
 Reinicie a API. Sem essas variáveis, `/login` mostra um aviso e o backend rejeita tokens (o painel exige um usuário Supabase válido). O fluxo: usuário loga no Supabase → recebe JWT → o painel chama `/v1/admin/*` com `Authorization: Bearer <jwt>` → o backend valida no Supabase e provisiona tenant/usuário no primeiro acesso.
 
+### Modo desenvolvimento (acessar o painel sem login)
+
+Para validar o painel sem configurar o Supabase, ative o modo dev no `.env`:
+
+```bash
+NEXUS_DEV_MODE=true
+DATABASE_URL=sqlite+aiosqlite:///./nexus_dev.db   # dev sem Postgres/Docker
+```
+
+Rode `alembic upgrade head` e reinicie. Em `/login` aparece o botão **"Entrar sem login (dev)"**, que dá acesso a um tenant/usuário de desenvolvimento. O bypass usa o token sentinela `dev-local-access` (header `Authorization: Bearer dev-local-access`) e **só funciona quando `NEXUS_DEV_MODE=true` e `NEXUS_ENV` ≠ `production`** — em produção é ignorado.
+
 ## Estrutura
 ```
 app/

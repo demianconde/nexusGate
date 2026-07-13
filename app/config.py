@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     log_level: str = Field(default="INFO", alias="NEXUS_LOG_LEVEL")
     log_json: bool = Field(default=False, alias="NEXUS_LOG_JSON")
 
+    # Modo de desenvolvimento: habilita bypass de login no painel.
+    # NUNCA tem efeito em produção (ver dev_bypass_enabled).
+    dev_mode: bool = Field(default=False, alias="NEXUS_DEV_MODE")
+
     # Infra
     database_url: str = Field(
         default="postgresql+asyncpg://postgres:postgres@localhost:5432/nexusgate",
@@ -43,6 +47,11 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.env.lower() == "production"
+
+    @property
+    def dev_bypass_enabled(self) -> bool:
+        """Bypass de login só vale em dev — jamais em produção."""
+        return self.dev_mode and not self.is_production
 
 
 @lru_cache

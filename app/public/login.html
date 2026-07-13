@@ -40,6 +40,11 @@
                 <span id="toggleText">Não tem conta?</span>
                 <button class="link-btn" id="toggleBtn" type="button">Criar conta</button>
             </div>
+
+            <div id="devWrap" style="display:none; margin-top:1.5rem">
+                <div class="divider">modo desenvolvedor</div>
+                <button class="btn btn-ghost btn-block" type="button" id="devBtn">🛠 Entrar sem login (dev)</button>
+            </div>
         </div>
     </div>
 
@@ -73,8 +78,17 @@
                     showMsg('Não foi possível carregar a configuração do servidor.', 'error');
                     return;
                 }
+                // Modo dev: botão para entrar sem login.
+                if (cfg.dev_mode && cfg.dev_token) {
+                    document.getElementById('devWrap').style.display = 'block';
+                    document.getElementById('devBtn').addEventListener('click', () => {
+                        localStorage.setItem('nexus_token', cfg.dev_token);
+                        window.location.href = '/dashboard';
+                    });
+                }
+
                 if (!cfg.configured) {
-                    showMsg('Supabase ainda não configurado. Defina SUPABASE_URL e SUPABASE_ANON_KEY no .env do servidor para habilitar o login.', 'warn');
+                    showMsg('Supabase não configurado — login por e-mail desabilitado. Use o botão de modo dev abaixo para validar o painel.', 'warn');
                     submitBtn.disabled = true;
                     magicLinkBtn.disabled = true;
                     return;

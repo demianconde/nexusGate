@@ -11,6 +11,10 @@ venv/
 .env
 *.local
 
+# Banco de dev (SQLite)
+*.db
+*.sqlite3
+
 # IDE / SO
 .vscode/
 .idea/

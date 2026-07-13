@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app import __version__
 from app.api import admin, health, proxy
+from app.auth.supabase import DEV_ACCESS_TOKEN
 from app.config import get_settings
 from app.logging_config import configure_logging, get_logger
 
@@ -76,13 +77,15 @@ def create_app() -> FastAPI:
     @app.get("/public-config", include_in_schema=False)
     async def public_config() -> JSONResponse:
         """Config pública (anon key do Supabase é destinada ao browser)."""
-        return JSONResponse(
-            {
-                "supabase_url": settings.supabase_url or "",
-                "supabase_anon_key": settings.supabase_anon_key or "",
-                "configured": bool(settings.supabase_url and settings.supabase_anon_key),
-            }
-        )
+        body = {
+            "supabase_url": settings.supabase_url or "",
+            "supabase_anon_key": settings.supabase_anon_key or "",
+            "configured": bool(settings.supabase_url and settings.supabase_anon_key),
+            "dev_mode": settings.dev_bypass_enabled,
+        }
+        if settings.dev_bypass_enabled:
+            body["dev_token"] = DEV_ACCESS_TOKEN
+        return JSONResponse(body)
 
     # Assets estáticos (css/js/vendor) em app/public/.
     app.mount("/static", StaticFiles(directory=PUBLIC_DIR), name="static")

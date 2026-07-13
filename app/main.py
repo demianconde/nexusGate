@@ -4,15 +4,20 @@ from __future__ import annotations
 
 import uuid
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import structlog
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from app import __version__
 from app.api import admin, health, proxy
 from app.config import get_settings
 from app.logging_config import configure_logging, get_logger
+
+PUBLIC_DIR = Path(__file__).parent / "public"
 
 
 @asynccontextmanager
@@ -55,6 +60,14 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(admin.router)
     app.include_router(proxy.router)
+
+    @app.get("/", include_in_schema=False)
+    async def landing() -> FileResponse:
+        return FileResponse(PUBLIC_DIR / "landing.html")
+
+    # Assets estáticos futuros (css/js/imagens) em app/public/.
+    app.mount("/static", StaticFiles(directory=PUBLIC_DIR), name="static")
+
     return app
 
 

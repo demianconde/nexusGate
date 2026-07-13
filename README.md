@@ -4,6 +4,8 @@
 
 > Reescrita do protótipo `nexusGate` como produto real. Stack oficial: **Python 3.11 + FastAPI**. Entrega: **SaaS gerenciado**. Auth do painel: **Supabase**.
 
+**Posicionamento:** gateway de IA **feito para o Brasil** — LGPD by design, dados no Brasil, PT-BR, preços em **BRL**, **Pix/boleto** e NF-e; **BYOK zero markup** sobre tokens; e **economia auditável** (relatório de ROI exportável). Paridade técnica com os concorrentes (fallback, observabilidade, cache, guardrails/PII) + diferenciação por região, compliance e transparência de preço.
+
 ## Arquitetura (resumo)
 
 ```

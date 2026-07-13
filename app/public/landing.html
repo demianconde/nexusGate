@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NexusGate | Gateway de IA para empresas brasileiras — BYOK sem markup, LGPD</title>
+    <meta name="description" content="Gateway de LLM feito para o Brasil: use suas próprias chaves (BYOK) sem markup sobre tokens, roteie para o modelo mais barato que resolve, cacheie o repetido e comprove a economia. LGPD, dados no Brasil, Pix e boleto.">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        brand: {
+                            50: '#f0fdfa', 100: '#ccfbf1', 300: '#5eead4', 400: '#2dd4bf',
+                            500: '#14b8a6', 600: '#0d9488', 900: '#134e4a', 950: '#042f2e',
+                        },
+                        dark: { 900: '#0f172a', 800: '#1e293b', 700: '#334155' }
+                    },
+                    animation: { 'blob': 'blob 7s infinite' },
+                    keyframes: {
+                        blob: {
+                            '0%': { transform: 'translate(0px, 0px) scale(1)' },
+                            '33%': { transform: 'translate(30px, -50px) scale(1.1)' },
+                            '66%': { transform: 'translate(-20px, 20px) scale(0.9)' },
+                            '100%': { transform: 'translate(0px, 0px) scale(1)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #f8fafc; }
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .text-gradient {
+            background-clip: text; -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-image: linear-gradient(to right, #2dd4bf, #3b82f6);
+        }
+        .animation-delay-2000 { animation-delay: 2s; }
+        .animation-delay-4000 { animation-delay: 4s; }
+        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none; height: 24px; width: 24px; border-radius: 50%;
+            background: #2dd4bf; cursor: pointer; margin-top: -8px;
+            box-shadow: 0 0 15px rgba(45, 212, 191, 0.5);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%; height: 8px; cursor: pointer; background: #334155; border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="antialiased overflow-x-hidden relative">
+
+    <!-- Background Elements -->
+    <div class="absolute top-0 left-0 w-full h-full overflow-hidden -z-10 pointer-events-none">
+        <div class="absolute top-[-10%] left-[-10%] w-96 h-96 bg-brand-600 rounded-full mix-blend-multiply filter blur-[128px] opacity-20 animate-blob"></div>
+        <div class="absolute top-[20%] right-[-10%] w-96 h-96 bg-blue-600 rounded-full mix-blend-multiply filter blur-[128px] opacity-20 animate-blob animation-delay-2000"></div>
+        <div class="absolute bottom-[-20%] left-[20%] w-96 h-96 bg-purple-600 rounded-full mix-blend-multiply filter blur-[128px] opacity-20 animate-blob animation-delay-4000"></div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="fixed w-full z-50 glass-panel border-b-0 border-slate-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-20">
+                <div class="flex items-center gap-2">
+                    <i class="ph-fill ph-infinity text-brand-400 text-3xl"></i>
+                    <span class="font-bold text-xl tracking-tight">NexusGate</span>
+                </div>
+                <div class="hidden md:flex space-x-8 text-sm font-medium text-slate-300">
+                    <a href="#como-funciona" class="hover:text-brand-400 transition">Como Funciona</a>
+                    <a href="#recursos" class="hover:text-brand-400 transition">Recursos</a>
+                    <a href="#brasil" class="hover:text-brand-400 transition">Feito para o Brasil</a>
+                    <a href="#simulador" class="hover:text-brand-400 transition">Economia</a>
+                    <a href="#precos" class="hover:text-brand-400 transition">Preços</a>
+                    <a href="/docs" class="hover:text-brand-400 transition">API</a>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <a href="#" class="hidden md:block text-sm font-medium text-slate-300 hover:text-white transition">Login</a>
+                    <a href="#precos" class="bg-brand-500 hover:bg-brand-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition shadow-lg shadow-brand-500/30">
+                        Começar Grátis
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="pt-32 pb-20 lg:pt-48 lg:pb-28 px-4">
+        <div class="max-w-7xl mx-auto text-center">
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full glass-panel text-brand-400 text-xs font-semibold uppercase tracking-wider mb-8">
+                <span class="relative flex h-2 w-2">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-75"></span>
+                  <span class="relative inline-flex rounded-full h-2 w-2 bg-brand-500"></span>
+                </span>
+                BYOK · Zero markup sobre tokens
+            </div>
+            <h1 class="text-5xl md:text-7xl font-bold tracking-tight mb-6 leading-tight">
+                Sua fatura de IA, <br class="hidden md:block"/>
+                <span class="text-gradient">até 70% menor.</span>
+            </h1>
+            <p class="mt-4 text-lg md:text-xl text-slate-400 max-w-3xl mx-auto mb-6 leading-relaxed">
+                O gateway de LLM feito para empresas brasileiras. Ele roteia cada requisição para o <strong>modelo mais barato que resolve</strong>, reaproveita respostas com <strong>cache semântico</strong> e usa <strong>a sua própria chave (BYOK)</strong> — cifrada em repouso. E o melhor: <strong class="text-white">não cobramos pedágio sobre seus tokens.</strong>
+            </p>
+            <p class="text-sm text-slate-500 mb-10">LGPD · dados no Brasil · Pix e boleto · suporte em português</p>
+            <div class="flex flex-col sm:flex-row justify-center gap-4">
+                <a href="#simulador" class="bg-brand-500 hover:bg-brand-600 text-white px-8 py-4 rounded-xl text-lg font-semibold transition shadow-lg shadow-brand-500/25 flex items-center justify-center gap-2">
+                    <i class="ph ph-calculator text-xl"></i> Calcular Economia
+                </a>
+                <a href="/docs" class="glass-panel hover:bg-slate-800 text-white px-8 py-4 rounded-xl text-lg font-semibold transition flex items-center justify-center gap-2 border border-slate-700">
+                    <i class="ph ph-code text-xl"></i> Ver Documentação
+                </a>
+            </div>
+
+            <!-- Hero Dashboard Mockup -->
+            <div class="mt-20 relative mx-auto max-w-5xl">
+                <div class="glass-panel rounded-2xl border border-slate-700 shadow-2xl p-4 md:p-8">
+                    <div class="flex items-center justify-between mb-6 border-b border-slate-700 pb-4">
+                        <div class="flex space-x-2">
+                            <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                            <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                            <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                        </div>
+                        <div class="text-slate-400 text-sm font-mono flex gap-4">
+                            <span><i class="ph ph-activity"></i> Roteamento Ativo</span>
+                            <span class="text-brand-400"><i class="ph ph-shield-check"></i> AES-256-GCM</span>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 font-mono text-sm">
+                        <div class="bg-slate-900 rounded-lg p-4 border border-slate-800">
+                            <p class="text-slate-500 mb-2">📥 Requisição</p>
+                            <p class="text-slate-300">"Refatore esta função e adicione testes unitários."</p>
+                            <div class="mt-4 flex justify-between text-xs">
+                                <span class="text-slate-500">Tokens: ~180</span>
+                                <span class="text-brand-400">Baixa complexidade</span>
+                            </div>
+                        </div>
+                        <div class="bg-slate-900 rounded-lg p-4 border border-slate-800 flex flex-col justify-center items-center relative">
+                            <i class="ph ph-arrows-left-right text-3xl text-brand-500 mb-2"></i>
+                            <p class="text-slate-300 font-bold">Nexus Router</p>
+                            <p class="text-slate-500 text-xs mt-1">BYOK injetada em memória</p>
+                        </div>
+                        <div class="bg-slate-900 rounded-lg p-4 border border-slate-800 border-l-4 border-l-brand-500">
+                            <p class="text-slate-500 mb-2">🚀 Rota escolhida</p>
+                            <p class="text-white font-bold mb-1">Qwen3-Coder (rápido/barato)</p>
+                            <p class="text-green-400 text-xs mt-2">Economia de R$ 0,015 vs modelo premium</p>
+                            <p class="text-slate-500 text-xs">Cache: MISS · 130ms</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Recursos & Features -->
+    <section id="recursos" class="py-20 border-t border-slate-800 relative z-10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl md:text-4xl font-bold mb-4">Um gateway, quatro alavancas de economia</h2>
+                <p class="text-slate-400 max-w-2xl mx-auto">Infraestrutura pronta de produção para você parar de pagar caro por tarefas que um modelo menor resolve — mantendo controle e segurança das suas chaves.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <!-- 1 -->
+                <div class="glass-panel p-8 rounded-2xl hover:-translate-y-2 transition duration-300 border border-slate-800 hover:border-brand-500/50">
+                    <div class="w-14 h-14 rounded-xl bg-slate-800 flex items-center justify-center mb-6 text-brand-400">
+                        <i class="ph ph-git-branch text-3xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3">Roteamento por custo</h3>
+                    <p class="text-slate-400 leading-relaxed text-sm">Cada prompt é classificado por complexidade e tamanho. Tarefas simples vão para modelos baratos; as complexas, para os premium. Com catálogo de preços real, calculamos quanto você economizou em cada chamada.</p>
+                </div>
+                <!-- 2 -->
+                <div class="glass-panel p-8 rounded-2xl hover:-translate-y-2 transition duration-300 border border-slate-800 hover:border-blue-500/50">
+                    <div class="w-14 h-14 rounded-xl bg-slate-800 flex items-center justify-center mb-6 text-blue-400">
+                        <i class="ph ph-lock-key text-3xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3">BYOK sem markup</h3>
+                    <p class="text-slate-400 leading-relaxed text-sm">Suas chaves de OpenAI, Anthropic e Qwen ficam cifradas em repouso com AES-256-GCM e são usadas só em memória, no instante da chamada. Você paga o provedor direto, no seu preço — <strong class="text-slate-200">sem pedágio sobre tokens</strong>.</p>
+                </div>
+                <!-- 3 -->
+                <div class="glass-panel p-8 rounded-2xl hover:-translate-y-2 transition duration-300 border border-slate-800 hover:border-purple-500/50">
+                    <div class="w-14 h-14 rounded-xl bg-slate-800 flex items-center justify-center mb-6 text-purple-400">
+                        <i class="ph ph-lightning text-3xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3">Cache semântico</h3>
+                    <p class="text-slate-400 leading-relaxed text-sm">Requisições parecidas não pagam duas vezes. Usamos embeddings reais e busca vetorial no Redis para servir respostas repetidas em milissegundos — cortando custo e latência de vez.</p>
+                </div>
+                <!-- 4 -->
+                <div class="glass-panel p-8 rounded-2xl hover:-translate-y-2 transition duration-300 border border-slate-800 hover:border-brand-500/50">
+                    <div class="w-14 h-14 rounded-xl bg-slate-800 flex items-center justify-center mb-6 text-brand-400">
+                        <i class="ph ph-plugs-connected text-3xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3">Multi-provider unificado</h3>
+                    <p class="text-slate-400 leading-relaxed text-sm">Uma única API compatível com o formato OpenAI para falar com OpenAI, Anthropic e Qwen. Streaming de verdade (SSE) e fallback entre provedores, sem reescrever integração.</p>
+                </div>
+                <!-- 5 -->
+                <div class="glass-panel p-8 rounded-2xl hover:-translate-y-2 transition duration-300 border border-slate-800 hover:border-blue-500/50">
+                    <div class="w-14 h-14 rounded-xl bg-slate-800 flex items-center justify-center mb-6 text-blue-400">
+                        <i class="ph ph-seal-check text-3xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3">Economia auditável</h3>
+                    <p class="text-slate-400 leading-relaxed text-sm">Não é só um número bonito no painel. Você recebe um relatório de economia por modelo e período, com metodologia clara e exportável — pronto para provar o ROI para o financeiro.</p>
+                </div>
+                <!-- 6 -->
+                <div class="glass-panel p-8 rounded-2xl hover:-translate-y-2 transition duration-300 border border-slate-800 hover:border-purple-500/50">
+                    <div class="w-14 h-14 rounded-xl bg-slate-800 flex items-center justify-center mb-6 text-purple-400">
+                        <i class="ph ph-shield-check text-3xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3">LGPD, guardrails & segurança</h3>
+                    <p class="text-slate-400 leading-relaxed text-sm">Redação de PII, filtros de conteúdo e isolamento por tenant. Dados hospedados no Brasil e processo aderente à LGPD — feito para empresas que levam privacidade a sério.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Feito para o Brasil -->
+    <section id="brasil" class="py-20 bg-dark-800/50 border-t border-slate-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-14">
+                <h2 class="text-3xl md:text-4xl font-bold mb-4">Feito para o <span class="text-brand-400">Brasil</span></h2>
+                <p class="text-slate-400 max-w-2xl mx-auto">A maioria dos gateways é gringa: só em inglês, dólar, cartão internacional e sem preocupação com a LGPD. O NexusGate nasceu aqui.</p>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="glass-panel p-6 rounded-2xl border border-slate-800 text-center">
+                    <i class="ph ph-shield-check text-3xl text-brand-400 mb-3"></i>
+                    <h4 class="font-bold text-white mb-1">LGPD & dados no Brasil</h4>
+                    <p class="text-sm text-slate-400">Residência de dados nacional e processos aderentes à LGPD.</p>
+                </div>
+                <div class="glass-panel p-6 rounded-2xl border border-slate-800 text-center">
+                    <i class="ph ph-pix-logo text-3xl text-brand-400 mb-3"></i>
+                    <h4 class="font-bold text-white mb-1">Pix e boleto</h4>
+                    <p class="text-sm text-slate-400">Pague em BRL do jeito brasileiro — sem cartão internacional.</p>
+                </div>
+                <div class="glass-panel p-6 rounded-2xl border border-slate-800 text-center">
+                    <i class="ph ph-translate text-3xl text-brand-400 mb-3"></i>
+                    <h4 class="font-bold text-white mb-1">Tudo em português</h4>
+                    <p class="text-sm text-slate-400">Painel, documentação e suporte em PT-BR, sem tradução de máquina.</p>
+                </div>
+                <div class="glass-panel p-6 rounded-2xl border border-slate-800 text-center">
+                    <i class="ph ph-receipt text-3xl text-brand-400 mb-3"></i>
+                    <h4 class="font-bold text-white mb-1">Nota fiscal</h4>
+                    <p class="text-sm text-slate-400">Faturamento com NF-e para sua empresa se organizar.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Como Funciona -->
+    <section id="como-funciona" class="py-20 border-t border-slate-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col lg:flex-row items-center gap-16">
+                <div class="lg:w-1/2">
+                    <h2 class="text-3xl md:text-4xl font-bold mb-6">Integração em <span class="text-brand-400">1 minuto</span></h2>
+                    <p class="text-slate-400 mb-8 leading-relaxed">Você não muda sua stack. O NexusGate é compatível com o formato da API da OpenAI: troque a <code>base_url</code> e use a sua chave do NexusGate. O resto continua igual.</p>
+
+                    <div class="space-y-6">
+                        <div class="flex gap-4">
+                            <div class="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-brand-400 shrink-0">1</div>
+                            <div>
+                                <h4 class="font-bold text-white mb-1">Cadastre suas chaves BYOK</h4>
+                                <p class="text-sm text-slate-500">Adicione suas API keys (OpenAI, Anthropic, Qwen) no cofre cifrado. Login do painel via Supabase.</p>
+                            </div>
+                        </div>
+                        <div class="flex gap-4">
+                            <div class="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-brand-400 shrink-0">2</div>
+                            <div>
+                                <h4 class="font-bold text-white mb-1">Aponte a base URL</h4>
+                                <p class="text-sm text-slate-500">Use <code>https://api.nexusgate.com.br/v1</code> e sua chave <code>nxg_...</code> no header.</p>
+                            </div>
+                        </div>
+                        <div class="flex gap-4">
+                            <div class="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-brand-400 shrink-0">3</div>
+                            <div>
+                                <h4 class="font-bold text-white mb-1">Roteamento + cache automáticos</h4>
+                                <p class="text-sm text-slate-500">Interceptamos, escolhemos o modelo certo, servimos do cache quando dá e devolvemos em streaming.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="lg:w-1/2 w-full">
+                    <div class="glass-panel rounded-xl p-4 md:p-6 border border-slate-700 shadow-2xl">
+                        <div class="flex items-center justify-between mb-4">
+                            <span class="text-xs font-mono text-slate-400">exemplo.py</span>
+                            <i class="ph ph-copy text-slate-400 cursor-pointer hover:text-white transition"></i>
+                        </div>
+                        <pre class="font-mono text-sm overflow-x-auto text-slate-300"><code><span class="text-purple-400">from</span> openai <span class="text-purple-400">import</span> OpenAI
+
+client = OpenAI(
+    base_url=<span class="text-yellow-300">"https://api.nexusgate.com.br/v1"</span>,
+    api_key=<span class="text-yellow-300">"nxg_a1b2c3d4.•••••••"</span>,  <span class="text-slate-500"># chave do NexusGate</span>
+)
+
+resp = client.chat.completions.create(
+    model=<span class="text-yellow-300">"nexus-auto"</span>,      <span class="text-slate-500"># roteamento automático</span>
+    messages=[{<span class="text-green-400">"role"</span>: <span class="text-yellow-300">"user"</span>,
+               <span class="text-green-400">"content"</span>: <span class="text-yellow-300">"Escreva testes para X"</span>}],
+    stream=<span class="text-purple-400">True</span>,
+)</code></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Simulador de Economia -->
+    <section id="simulador" class="py-20 border-t border-slate-800 relative">
+        <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] bg-brand-600/10 rounded-full blur-[120px] pointer-events-none"></div>
+
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl md:text-4xl font-bold mb-4">Calcule seu <span class="text-brand-400">ROI</span> imediato</h2>
+                <p class="text-slate-400">Estime quanto você deixa na mesa usando modelos premium para tudo — quando roteamento por custo e cache semântico resolveriam a maior parte por uma fração do preço.</p>
+            </div>
+
+            <div class="glass-panel border border-slate-700 rounded-3xl p-6 md:p-12 shadow-2xl">
+                <div class="mb-10">
+                    <div class="flex justify-between items-end mb-4">
+                        <label class="block text-sm font-medium text-slate-300">Seu gasto atual mensal em APIs de LLM</label>
+                        <span class="text-2xl font-bold text-white">R$ <span id="currentSpendVal">5.000</span></span>
+                    </div>
+                    <input type="range" id="spendSlider" min="250" max="25000" step="250" value="5000" class="w-full">
+                    <div class="flex justify-between mt-2 text-xs text-slate-500 font-mono">
+                        <span>R$ 250</span>
+                        <span>R$ 25.000+</span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 border-t border-slate-700 pt-8 mt-8">
+                    <div class="bg-dark-900/50 rounded-2xl p-6 border border-slate-800">
+                        <h4 class="text-slate-400 text-sm font-medium mb-1">Custo projetado com NexusGate</h4>
+                        <div class="flex items-baseline gap-2">
+                            <span class="text-3xl font-bold text-white">R$ <span id="projectedCost">1.549</span></span>
+                            <span class="text-xs text-slate-500">/mês nas APIs</span>
+                        </div>
+                        <ul class="mt-4 space-y-2 text-sm text-slate-400">
+                            <li class="flex items-center gap-2"><i class="ph ph-check-circle text-brand-400"></i> ~60% roteado para tier barato</li>
+                            <li class="flex items-center gap-2"><i class="ph ph-check-circle text-brand-400"></i> ~20% servido do cache semântico</li>
+                            <li class="flex items-center gap-2"><i class="ph ph-check-circle text-brand-400"></i> ~20% mantido no tier premium</li>
+                        </ul>
+                    </div>
+
+                    <div class="bg-gradient-to-br from-brand-900/40 to-blue-900/40 rounded-2xl p-6 border border-brand-500/30 relative overflow-hidden">
+                        <div class="absolute -right-4 -top-4 text-brand-500/20">
+                            <i class="ph-fill ph-piggy-bank text-8xl"></i>
+                        </div>
+                        <h4 class="text-brand-300 text-sm font-medium mb-1 relative z-10">Sua economia estimada</h4>
+                        <div class="flex items-baseline gap-2 relative z-10">
+                            <span class="text-4xl md:text-5xl font-bold text-white">R$ <span id="savings">3.202</span></span>
+                            <span class="text-sm text-brand-300">/mês</span>
+                        </div>
+                        <p class="mt-4 text-xs text-slate-300 relative z-10">
+                            *Já deduz a assinatura Pro (R$ 249/mês) e é <strong>zero markup sobre tokens</strong>. Estimativa; a economia real depende do seu tráfego.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Pricing -->
+    <section id="precos" class="py-20 bg-dark-800/30 border-t border-slate-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl md:text-4xl font-bold mb-4">Preços simples e transparentes</h2>
+                <p class="text-slate-400 max-w-2xl mx-auto">Você paga pela orquestração. O consumo dos modelos é cobrado direto na sua chave (BYOK), no preço do provedor. <strong class="text-slate-200">Zero markup sobre tokens.</strong> Pague com Pix, boleto ou cartão.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+                <!-- Hobby -->
+                <div class="glass-panel p-8 rounded-2xl border border-slate-700 flex flex-col">
+                    <h3 class="text-xl font-bold text-white mb-2">Hobby</h3>
+                    <p class="text-slate-400 text-sm mb-6">Para testar projetos e provas de conceito.</p>
+                    <div class="mb-6">
+                        <span class="text-4xl font-bold text-white">R$ 0</span>
+                        <span class="text-slate-400 text-sm">/mês</span>
+                    </div>
+                    <ul class="space-y-4 mb-8 flex-grow text-sm text-slate-300">
+                        <li class="flex items-center gap-2"><i class="ph ph-check text-brand-400"></i> 60 requisições/min</li>
+                        <li class="flex items-center gap-2"><i class="ph ph-check text-brand-400"></i> Roteamento por custo</li>
+                        <li class="flex items-center gap-2"><i class="ph ph-check text-brand-400"></i> Cache semântico</li>
+                        <li class="flex items-center gap-2"><i class="ph ph-check text-brand-400"></i> Cofre BYOK cifrado</li>
+                    </ul>
+                    <a href="#" class="w-full py-3 rounded-lg border border-slate-600 text-center text-white hover:bg-slate-800 transition font-medium">Começar Grátis</a>
+                </div>
+
+                <!-- Pro -->
+                <div class="glass-panel p-8 rounded-2xl border-2 border-brand-500 relative flex flex-col transform md:-translate-y-4 shadow-2xl shadow-brand-900/50">
+                    <div class="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-brand-500 text-white px-3 py-1 rounded-full text-xs font-bold tracking-wide uppercase">
+                        Mais Popular
+                    </div>
+                    <h3 class="text-xl font-bold text-white mb-2">Pro</h3>
+                    <p class="text-slate-400 text-sm mb-6">Para engenheiros solo e pequenas equipes.</p>
+                    <div class="mb-6">
+                        <span class="text-4xl font-bold text-white">R$ 249</span>
+                        <span class="text-slate-400 text-sm">/mês</span>
+                    </div>
+                    <ul class="space-y-4 mb-8 flex-grow text-sm text-slate-300">
+                        <li class="flex items-center gap-2"><i class="ph ph-check text-brand-400"></i> 600 requisições/min</li>
+                        <li class="flex items-center gap-2"><i class="ph ph-check text-brand-400"></i> Roteamento avançado + fallback</li>
+                        <li class="flex items-center gap-2"><i class="ph ph-check text-brand-400"></i> Relatório de economia auditável</li>
+                        <li class="flex items-center gap-2"><i class="ph ph-check text-brand-400"></i> Cache semântico com TTL configurável</li>
+                        <li class="flex items-center gap-2"><i class="ph ph-check text-brand-400"></i> Multi-provider (OpenAI/Anthropic/Qwen)</li>
+                    </ul>
+                    <a href="#" class="w-full py-3 rounded-lg bg-brand-500 hover:bg-brand-600 text-center text-white transition font-medium shadow-lg shadow-brand-500/25">Assinar Pro</a>
+                </div>
+
+                <!-- Teams -->
+                <div class="glass-panel p-8 rounded-2xl border border-slate-700 flex flex-col">
+                    <h3 class="text-xl font-bold text-white mb-2">Teams</h3>
+                    <p class="text-slate-400 text-sm mb-6">Para agências e times de desenvolvimento.</p>
+                    <div class="mb-6">
+                        <span class="text-4xl font-bold text-white">R$ 999</span>
+                        <span class="text-slate-400 text-sm">/mês</span>
+                    </div>
+                    <ul class="space-y-4 mb-8 flex-grow text-sm text-slate-300">
+                        <li class="flex items-center gap-2"><i class="ph ph-check text-brand-400"></i> Tudo do plano Pro</li>
+                        <li class="flex items-center gap-2"><i class="ph ph-check text-brand-400"></i> 6.000 requisições/min</li>
+                        <li class="flex items-center gap-2"><i class="ph ph-check text-brand-400"></i> Times, roles e chaves por app</li>
+                        <li class="flex items-center gap-2"><i class="ph ph-check text-brand-400"></i> Guardrails / redação de PII (LGPD)</li>
+                        <li class="flex items-center gap-2"><i class="ph ph-check text-brand-400"></i> SLA de 99.9% de uptime</li>
+                    </ul>
+                    <a href="#" class="w-full py-3 rounded-lg border border-slate-600 text-center text-white hover:bg-slate-800 transition font-medium">Falar com Vendas</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA final -->
+    <section class="py-20 border-t border-slate-800">
+        <div class="max-w-4xl mx-auto px-4 text-center">
+            <h2 class="text-3xl md:text-4xl font-bold mb-4">Comece a economizar hoje</h2>
+            <p class="text-slate-400 mb-8 max-w-2xl mx-auto">Conecte suas chaves, troque a base URL e veja a economia aparecer no relatório. Sem cartão para o plano Hobby.</p>
+            <a href="#precos" class="inline-flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white px-8 py-4 rounded-xl text-lg font-semibold transition shadow-lg shadow-brand-500/25">
+                <i class="ph ph-rocket-launch text-xl"></i> Criar conta grátis
+            </a>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800 bg-dark-900 py-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="flex items-center gap-2 mb-4 md:mb-0">
+                    <i class="ph-fill ph-infinity text-brand-400 text-2xl"></i>
+                    <span class="font-bold text-lg text-slate-300">NexusGate</span>
+                </div>
+                <div class="flex space-x-6 text-sm text-slate-500">
+                    <a href="#" class="hover:text-brand-400 transition">Termos</a>
+                    <a href="#" class="hover:text-brand-400 transition">Privacidade & LGPD</a>
+                    <a href="/docs" class="hover:text-brand-400 transition">Documentação da API</a>
+                    <a href="#" class="hover:text-brand-400 transition">Contato</a>
+                </div>
+            </div>
+            <div class="mt-8 text-center text-xs text-slate-600">
+                &copy; 2026 NexusGate. Chaves BYOK cifradas em repouso — nunca armazenadas em texto plano. Zero markup sobre tokens.
+            </div>
+        </div>
+    </footer>
+
+    <!-- Simulador -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const spendSlider = document.getElementById('spendSlider');
+            const currentSpendDisplay = document.getElementById('currentSpendVal');
+            const projectedCostDisplay = document.getElementById('projectedCost');
+            const savingsDisplay = document.getElementById('savings');
+
+            const PRO_PLAN_COST = 249;   // R$/mês
+            const PREMIUM_RATIO = 0.2;   // 20% precisam de modelo premium
+            const CHEAP_RATIO = 0.6;     // 60% vão para tier barato (~10% do custo premium)
+            const CACHE_RATIO = 0.2;     // 20% servidos do cache (~custo zero)
+            const CHEAP_COST_FACTOR = 0.1;
+
+            const fmt = (n) => n.toLocaleString('pt-BR');
+
+            function calculateSavings(currentSpend) {
+                const premiumCost = currentSpend * PREMIUM_RATIO;
+                const cheapCost = currentSpend * CHEAP_RATIO * CHEAP_COST_FACTOR;
+                const cacheCost = currentSpend * CACHE_RATIO * 0; // cache ~ custo zero
+                const projectedAPI_Cost = Math.round(premiumCost + cheapCost + cacheCost);
+                let totalSavings = currentSpend - (projectedAPI_Cost + PRO_PLAN_COST);
+                if (totalSavings < 0) totalSavings = 0;
+                return { projectedAPI_Cost, totalSavings };
+            }
+
+            function animateValue(obj, start, end, duration) {
+                let startTimestamp = null;
+                const step = (timestamp) => {
+                    if (!startTimestamp) startTimestamp = timestamp;
+                    const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                    obj.innerHTML = fmt(Math.floor(progress * (end - start) + start));
+                    if (progress < 1) window.requestAnimationFrame(step);
+                };
+                window.requestAnimationFrame(step);
+            }
+
+            function parseNum(text) {
+                return parseInt((text || '0').replace(/\./g, '').replace(/\D/g, '')) || 0;
+            }
+
+            function updateUI() {
+                const val = parseInt(spendSlider.value);
+                currentSpendDisplay.textContent = fmt(val);
+                const result = calculateSavings(val);
+                animateValue(projectedCostDisplay, parseNum(projectedCostDisplay.innerText), result.projectedAPI_Cost, 300);
+                animateValue(savingsDisplay, parseNum(savingsDisplay.innerText), result.totalSavings, 300);
+            }
+
+            spendSlider.addEventListener('input', updateUI);
+            updateUI();
+        });
+    </script>
+</body>
+</html>

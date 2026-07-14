@@ -20,7 +20,10 @@ from .schemas import (
     ApiKeyLimits,
     GuardrailsConfig,
     MeResponse,
+    RoutingConfig,
 )
+
+_ROUTING_MODES = {"heuristic", "classifier"}
 
 router = APIRouter(prefix="/v1/admin", tags=["admin"])
 
@@ -56,6 +59,27 @@ async def set_guardrails(
     tenant.guardrail_blocked_terms = (body.blocked_terms or "").strip() or None
     await db.commit()
     return {"pii": tenant.guardrail_pii, "blocked_terms": tenant.guardrail_blocked_terms or ""}
+
+
+@router.get("/routing")
+async def get_routing(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    tenant = await db.get(Tenant, user.tenant_id)
+    return {"mode": tenant.routing_mode}
+
+
+@router.put("/routing")
+async def set_routing(
+    body: RoutingConfig,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    tenant = await db.get(Tenant, user.tenant_id)
+    tenant.routing_mode = body.mode if body.mode in _ROUTING_MODES else "heuristic"
+    await db.commit()
+    return {"mode": tenant.routing_mode}
 
 
 @router.get("/keys", response_model=list[ApiKeyInfo])

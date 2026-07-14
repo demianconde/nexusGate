@@ -94,13 +94,20 @@ def _fallback_attempts(keys: list[ProviderKey], fallback: list[str] | None) -> l
     return out
 
 
-async def _plan(db: AsyncSession, tenant_id: uuid.UUID, body: ChatCompletionRequest) -> Plan:
+async def _plan(
+    db: AsyncSession,
+    tenant_id: uuid.UUID,
+    body: ChatCompletionRequest,
+    routing_mode: str | None = None,
+) -> Plan:
     keys = await _tenant_provider_keys(db, tenant_id)
 
     if body.model == "aegis-auto":
         if not keys:
             raise HTTPException(400, "Nenhuma credencial de provedor cadastrada para rotear.")
-        complexity = await classify_complexity([m.model_dump() for m in body.messages])
+        complexity = await classify_complexity(
+            [m.model_dump() for m in body.messages], routing_mode
+        )
         route = choose_route(complexity, keys)
         if route is None:
             raise HTTPException(
@@ -192,7 +199,7 @@ async def chat_completions(
                 detail="Orçamento mensal desta chave esgotado.",
             )
 
-    plan = await _plan(db, tenant_id, body)
+    plan = await _plan(db, tenant_id, body, ctx.tenant.routing_mode)
     plan.attempts = _apply_allowlist(plan.attempts, key)
     if not plan.attempts:
         raise HTTPException(

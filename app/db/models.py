@@ -34,6 +34,10 @@ class Tenant(Base):
     # Guardrails (config por tenant)
     guardrail_pii: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     guardrail_blocked_terms: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    # Roteamento aegis-auto: "heuristic" (sem IA) ou "classifier" (com IA leve).
+    routing_mode: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default="heuristic", default="heuristic"
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

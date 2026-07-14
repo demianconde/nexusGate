@@ -106,3 +106,8 @@ class LeadStatusUpdate(BaseModel):
 class GuardrailsConfig(BaseModel):
     pii: bool = False
     blocked_terms: str | None = None  # csv de termos bloqueados
+
+
+# ---------- Roteamento ----------
+class RoutingConfig(BaseModel):
+    mode: str = "heuristic"  # "heuristic" (sem IA) | "classifier" (com IA)

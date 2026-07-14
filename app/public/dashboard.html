@@ -110,6 +110,21 @@
                 </div>
                 <button class="btn btn-primary" id="gSave">Salvar guardrails</button>
             </div>
+            <div class="panel glass">
+                <div class="panel-head"><h2>Roteamento inteligente</h2></div>
+                <p class="muted" style="font-size:0.85rem;margin-bottom:1rem">Como o AegisFlow decide a complexidade de cada tarefa para escolher o modelo (no <code>aegis-auto</code>).</p>
+                <div class="field">
+                    <label for="routingMode">Modo de classificação</label>
+                    <select class="input" id="routingMode">
+                        <option value="heuristic">Usar algoritmo (rápido, sem custo)</option>
+                        <option value="classifier" title="Adiciona latência e um pequeno custo por requisição">Usar IA (mais preciso)</option>
+                    </select>
+                </div>
+                <p class="muted" id="routingHint" style="font-size:0.8rem;margin:-0.5rem 0 1rem;display:none;color:var(--brand-300)">
+                    ⚠️ O modo IA usa um modelo para classificar cada requisição — <strong>adiciona latência</strong> e um pequeno custo por chamada. O algoritmo é instantâneo e gratuito.
+                </p>
+                <button class="btn btn-primary" id="routingSave">Salvar roteamento</button>
+            </div>
             </div><!-- /tab-painel -->
 
             <div id="tab-uso" style="display:none">
@@ -596,6 +611,31 @@
                 } catch (err) { showMsg(err.message, 'error'); }
             });
 
+            // ----- Roteamento (IA vs algoritmo) -----
+            const routingMode = document.getElementById('routingMode');
+            const routingHint = document.getElementById('routingHint');
+            function updateRoutingHint() {
+                routingHint.style.display = routingMode.value === 'classifier' ? '' : 'none';
+            }
+            routingMode.addEventListener('change', updateRoutingHint);
+            async function loadRouting() {
+                try {
+                    const r = await (await api('/v1/admin/routing')).json();
+                    routingMode.value = r.mode || 'heuristic';
+                    updateRoutingHint();
+                } catch (e) { /* ignora */ }
+            }
+            document.getElementById('routingSave').addEventListener('click', async () => {
+                clearMsg();
+                try {
+                    const res = await api('/v1/admin/routing', { method: 'PUT', body: JSON.stringify({
+                        mode: routingMode.value,
+                    })});
+                    if (!res.ok) throw new Error('falha ao salvar');
+                    showMsg('Roteamento atualizado.', 'ok');
+                } catch (err) { showMsg(err.message, 'error'); }
+            });
+
             // ----- Exportar CSV -----
             document.getElementById('exportBtn').addEventListener('click', async () => {
                 try {
@@ -712,6 +752,7 @@
                     await loadKnownProviders();
                     await loadProviderKeys();
                     await loadGuardrails();
+                    await loadRouting();
                 } catch (err) {
                     if (err.message !== 'não autorizado') showMsg(err.message, 'error');
                 }

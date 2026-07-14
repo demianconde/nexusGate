@@ -73,10 +73,12 @@ async def _classify_with_llm(messages: list[dict]) -> str | None:
     return None
 
 
-async def classify_complexity(messages: list[dict]) -> str:
-    """Retorna 'high' ou 'low'. Usa o classificador de IA se habilitado; senão heurística."""
-    s = get_settings()
-    if s.routing_mode == "classifier":
+async def classify_complexity(messages: list[dict], mode: str | None = None) -> str:
+    """Retorna 'low'/'medium'/'high'. Usa o classificador de IA se o modo efetivo for
+    'classifier' (preferindo o modo do tenant; senão o global); caso contrário heurística.
+    """
+    effective = mode or get_settings().routing_mode
+    if effective == "classifier":
         result = await _classify_with_llm(messages)
         if result is not None:
             return result

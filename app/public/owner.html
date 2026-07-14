@@ -160,9 +160,27 @@
                     return;
                 }
                 if (!cfg.configured) { loginMsg.textContent = 'Supabase não configurado.'; loginMsg.className = 'msg show warn'; return; }
-                client = window.supabase.createClient(cfg.supabase_url, cfg.supabase_anon_key);
+                client = window.supabase.createClient(cfg.supabase_url, cfg.supabase_anon_key, {
+                    auth: { detectSessionInUrl: true, persistSession: true, autoRefreshToken: true },
+                });
+
+                let entered = false;
+                const enter = (session) => {
+                    if (entered || !session) return;
+                    entered = true;
+                    token = session.access_token;
+                    // limpa o code/hash da URL do OAuth
+                    if (window.location.search || window.location.hash) {
+                        history.replaceState({}, document.title, window.location.pathname);
+                    }
+                    showConsole(session.user && session.user.email);
+                };
+
+                // dispara quando a sessão é criada (após a troca do código OAuth)
+                client.auth.onAuthStateChange((_event, session) => enter(session));
+
                 const { data } = await client.auth.getSession();
-                if (data.session) { token = data.session.access_token; showConsole(data.session.user.email); }
+                if (data.session) enter(data.session);
             }
 
             document.getElementById('googleBtn').addEventListener('click', async () => {

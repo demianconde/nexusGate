@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IA e LGPD: Como Usar LLMs sem Violar a Lei de Dados | AegisFlow</title>
+    <meta name="description" content="Como usar IA generativa e LLMs (OpenAI, Anthropic) em conformidade com a LGPD: base legal, redação de PII, residência de dados no Brasil, criptografia de chaves e direitos do titular.">
+    <meta name="keywords" content="IA e LGPD, LLM LGPD, inteligência artificial LGPD, redação de PII, residência de dados, dados no Brasil IA, conformidade IA, privacidade IA">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://aegisflow.tech/artigos/ia-e-lgpd-como-usar-llms-em-conformidade">
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="AegisFlow">
+    <meta property="og:locale" content="pt_BR">
+    <meta property="og:url" content="https://aegisflow.tech/artigos/ia-e-lgpd-como-usar-llms-em-conformidade">
+    <meta property="og:image" content="https://aegisflow.tech/static/og-image.png">
+    <meta name="twitter:image" content="https://aegisflow.tech/static/og-image.png">
+    <meta property="og:title" content="IA e LGPD: Como Usar LLMs sem Violar a Lei de Dados">
+    <meta property="og:description" content="Base legal, redação de PII, residência de dados no Brasil e criptografia: o checklist para usar IA em conformidade com a LGPD.">
+    <meta property="article:published_time" content="2026-07-14">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="stylesheet" href="/static/styles.css?v=4">
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Article",
+      "headline": "IA e LGPD: Como Usar LLMs sem Violar a Lei de Dados",
+      "description": "Guia de conformidade LGPD para uso de IA generativa e LLMs em empresas brasileiras.",
+      "inLanguage": "pt-BR",
+      "datePublished": "2026-07-14",
+      "dateModified": "2026-07-14",
+      "author": { "@type": "Organization", "name": "AegisFlow" },
+      "publisher": { "@type": "Organization", "name": "AegisFlow", "url": "https://aegisflow.tech/" },
+      "mainEntityOfPage": { "@type": "WebPage", "@id": "https://aegisflow.tech/artigos/ia-e-lgpd-como-usar-llms-em-conformidade" }
+    }
+    </script>
+</head>
+<body>
+    <div class="bg-blobs"><div class="blob b1"></div><div class="blob b2"></div></div>
+
+    <nav class="nav glass">
+        <div class="container nav-inner">
+            <a href="/" class="logo"><span class="mark">∞</span><span>AegisFlow</span></a>
+            <div class="nav-links">
+                <a href="/#recursos">Recursos</a>
+                <a href="/artigos">Artigos</a>
+                <a href="/documentacao">Documentação</a>
+            </div>
+            <div class="nav-cta"><a href="/#interesse" class="btn btn-primary">Tenho interesse</a></div>
+        </div>
+    </nav>
+
+    <article class="article-shell">
+        <div class="breadcrumb"><a href="/">Início</a> › <a href="/artigos">Artigos</a> › IA e LGPD</div>
+        <div class="article-body">
+            <h1>IA e LGPD: como usar LLMs sem violar a lei de dados</h1>
+            <p class="article-meta">Publicado em 14 de julho de 2026 · AegisFlow</p>
+
+            <p class="lead">Integrar IA generativa é irresistível, mas cada prompt pode carregar dados pessoais — de clientes, de funcionários ou código proprietário. No Brasil, isso coloca a Lei Geral de Proteção de Dados (LGPD) no centro da conversa. Este guia mostra como aproveitar os LLMs mantendo a conformidade. <em>(Conteúdo informativo, não substitui aconselhamento jurídico.)</em></p>
+
+            <h2>Por que a IA é um tema de LGPD</h2>
+            <p>Quando um desenvolvedor cola um trecho com dados de clientes num prompt, ou um sistema envia um cadastro para a IA resumir, há <strong>tratamento de dados pessoais</strong> — e, muitas vezes, transferência internacional, já que a maioria dos provedores processa fora do Brasil. A LGPD exige base legal, transparência e segurança para esse fluxo.</p>
+
+            <h2>Os principais riscos</h2>
+            <ul>
+                <li><strong>Vazamento de dados sensíveis</strong> em prompts (CPF, CNPJ, e-mail, dados de saúde/financeiros).</li>
+                <li><strong>Transferência internacional</strong> sem base legal ou salvaguardas adequadas.</li>
+                <li><strong>Falta de controle</strong> sobre onde os dados são armazenados e por quanto tempo.</li>
+                <li><strong>Chaves de API expostas</strong> em código, dando acesso indevido a serviços que processam dados.</li>
+            </ul>
+
+            <h2>Checklist para usar IA em conformidade com a LGPD</h2>
+
+            <h3>1. Defina a base legal e a finalidade</h3>
+            <p>Documente por que você trata cada dado (execução de contrato, legítimo interesse, consentimento) e limite o uso a essa finalidade.</p>
+
+            <h3>2. Redija a PII antes de enviar ao provedor</h3>
+            <p>Aplique redação/anonimização de dados pessoais (CPF, CNPJ, e-mail, telefone, cartão) <strong>antes</strong> de o prompt sair para um provedor hospedado. Assim, o modelo resolve a tarefa sem ver o dado sensível.</p>
+
+            <h3>3. Prefira residência de dados no Brasil</h3>
+            <p>Manter os dados armazenados no Brasil simplifica a conformidade e a comunicação com titulares e autoridades — e reforça a confiança dos seus clientes.</p>
+
+            <h3>4. Criptografe chaves e segredos</h3>
+            <p>Chaves de API devem ser cifradas em repouso (ex.: AES-256 via KMS) e nunca ficar em texto plano. No modelo <a href="/artigos/o-que-e-llm-gateway-ai-proxy">BYOK</a>, elas são usadas só em memória, no instante da chamada.</p>
+
+            <h3>5. Minimize e registre</h3>
+            <p>Envie o mínimo de contexto necessário e mantenha logs sem dados sensíveis, para auditoria e para responder a solicitações de titulares (art. 18 da LGPD).</p>
+
+            <h3>6. Garanta os direitos do titular</h3>
+            <p>Tenha processo para atender pedidos de acesso, correção e eliminação. Isso é muito mais simples quando os dados estão centralizados e no Brasil.</p>
+
+            <h2>Como um LLM Gateway ajuda na conformidade</h2>
+            <p>Fazer isso aplicação por aplicação é inviável. Um <a href="/artigos/o-que-e-llm-gateway-ai-proxy">LLM Gateway</a> centraliza as políticas: redação de PII, criptografia de chaves, isolamento por tenant, logs auditáveis e escolha de infraestrutura — tudo num ponto único, aplicado a todo o tráfego de IA da empresa.</p>
+
+            <h2>A abordagem do AegisFlow</h2>
+            <p>O <strong>AegisFlow</strong> nasceu no Brasil com a LGPD no centro: dados hospedados no Brasil, redação de PII opcional antes de provedores hospedados, chaves BYOK cifradas com AES-256 (KMS) e usadas apenas em memória. Você aproveita as melhores IAs do mundo mantendo o controle e a conformidade.</p>
+
+            <div class="article-cta glass">
+                <h2>Use IA com segurança e conformidade</h2>
+                <p>Conheça como o AegisFlow protege seus dados e simule quanto você economiza mantendo tudo em conformidade com a LGPD.</p>
+                <a href="/#interesse" class="btn btn-primary">Falar com o AegisFlow</a>
+            </div>
+
+            <div class="related">
+                <h3>Continue lendo</h3>
+                <a href="/artigos/o-que-e-llm-gateway-ai-proxy">O que é um LLM Gateway (AI Proxy)? →</a>
+                <a href="/artigos/como-reduzir-custos-de-ia-guia-para-ctos">Como reduzir custos de IA sem perder qualidade →</a>
+            </div>
+        </div>
+    </article>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-top">
+                <a href="/" class="logo"><span class="mark">∞</span><span>AegisFlow</span></a>
+                <div class="footer-links">
+                    <a href="/termos">Termos</a>
+                    <a href="/privacidade">Privacidade &amp; LGPD</a>
+                    <a href="/artigos">Artigos</a>
+                    <a href="/documentacao">Documentação</a>
+                </div>
+            </div>
+            <div class="copy">© 2026 AegisFlow. Chaves BYOK cifradas em repouso — nunca armazenadas em texto plano. Zero markup sobre tokens.</div>
+        </div>
+    </footer>
+</body>
+</html>

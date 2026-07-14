@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Como Reduzir o Custo do Cursor e do Copilot na Sua Empresa | AegisFlow</title>
+    <meta name="description" content="Cursor, GitHub Copilot e assistentes de IA disparam a fatura da engenharia. Veja como reduzir o custo apontando a base_url para um LLM Gateway com roteamento por custo e cache.">
+    <meta name="keywords" content="custo cursor, cursor caro, custo github copilot, reduzir custo copilot, base_url openai, gateway para IDE, IA para desenvolvedores custo">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://aegisflow.tech/artigos/reduzir-custo-cursor-copilot-empresa">
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="AegisFlow">
+    <meta property="og:locale" content="pt_BR">
+    <meta property="og:url" content="https://aegisflow.tech/artigos/reduzir-custo-cursor-copilot-empresa">
+    <meta property="og:image" content="https://aegisflow.tech/static/og-image.png">
+    <meta name="twitter:image" content="https://aegisflow.tech/static/og-image.png">
+    <meta property="og:title" content="Como Reduzir o Custo do Cursor e do Copilot na Sua Empresa">
+    <meta property="og:description" content="Aponte a base_url para um LLM Gateway com roteamento por custo e cache e corte a fatura de IA da engenharia — sem mudar o fluxo do time.">
+    <meta property="article:published_time" content="2026-07-14">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="stylesheet" href="/static/styles.css?v=4">
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Article",
+      "headline": "Como Reduzir o Custo do Cursor e do Copilot na Sua Empresa",
+      "description": "Como reduzir o custo de assistentes de IA como Cursor e GitHub Copilot usando um LLM Gateway com roteamento por custo e cache semântico.",
+      "inLanguage": "pt-BR",
+      "datePublished": "2026-07-14",
+      "dateModified": "2026-07-14",
+      "author": { "@type": "Organization", "name": "AegisFlow" },
+      "publisher": { "@type": "Organization", "name": "AegisFlow", "url": "https://aegisflow.tech/" },
+      "mainEntityOfPage": { "@type": "WebPage", "@id": "https://aegisflow.tech/artigos/reduzir-custo-cursor-copilot-empresa" }
+    }
+    </script>
+</head>
+<body>
+    <div class="bg-blobs"><div class="blob b1"></div><div class="blob b2"></div></div>
+
+    <nav class="nav glass">
+        <div class="container nav-inner">
+            <a href="/" class="logo"><span class="mark">∞</span><span>AegisFlow</span></a>
+            <div class="nav-links">
+                <a href="/#recursos">Recursos</a>
+                <a href="/artigos">Artigos</a>
+                <a href="/documentacao">Documentação</a>
+            </div>
+            <div class="nav-cta"><a href="/#interesse" class="btn btn-primary">Tenho interesse</a></div>
+        </div>
+    </nav>
+
+    <article class="article-shell">
+        <div class="breadcrumb"><a href="/">Início</a> › <a href="/artigos">Artigos</a> › Custo de Cursor e Copilot</div>
+        <div class="article-body">
+            <h1>Como reduzir o custo do Cursor e do Copilot na sua empresa</h1>
+            <p class="article-meta">Publicado em 14 de julho de 2026 · AegisFlow</p>
+
+            <p class="lead">Assistentes de IA como Cursor e GitHub Copilot deram um salto de produtividade — e, junto, um salto na fatura. Quando dezenas de desenvolvedores usam esses modelos o dia inteiro, o custo com APIs de IA vira uma das maiores linhas do orçamento de engenharia. Veja como controlá-lo sem tirar as ferramentas do time.</p>
+
+            <h2>Por que essas ferramentas ficam caras</h2>
+            <p>Ferramentas de IA para código consomem muitos tokens porque enviam bastante contexto (arquivos abertos, histórico, regras do projeto) e frequentemente usam os modelos mais caros para tudo — inclusive para tarefas triviais como imports, formatação e comentários. É o clássico <a href="/artigos/token-maxxing-vazamento-de-caixa-em-ia">Token Maxxing</a>, multiplicado por cada desenvolvedor.</p>
+
+            <h2>A saída errada: cortar ou limitar</h2>
+            <p>A reação instintiva — proibir modelos bons ou impor cotas rígidas — derruba a qualidade e trava o time no meio da tarde. Você troca custo por produtividade, o que sai mais caro no fim.</p>
+
+            <h2>A saída certa: um gateway entre a ferramenta e o provedor</h2>
+            <p>Muitas ferramentas de IA para código (incluindo o Cursor e clientes compatíveis com o formato da OpenAI) permitem configurar uma <strong>base_url</strong> e uma chave próprias. Isso abre uma porta poderosa: apontar a ferramenta para um <a href="/artigos/o-que-e-llm-gateway-ai-proxy">LLM Gateway</a> em vez de ir direto ao provedor.</p>
+            <p>Com o gateway no meio do caminho, você ganha, de forma transparente:</p>
+            <ul>
+                <li><strong>Roteamento por custo:</strong> tarefas simples vão para modelos baratos; as complexas, para os premium.</li>
+                <li><strong>Cache semântico:</strong> perguntas repetidas por vários devs são respondidas a custo zero.</li>
+                <li><strong>Visibilidade:</strong> quanto cada time/modelo consome, para decisões de FinOps.</li>
+                <li><strong>BYOK e segurança:</strong> suas chaves cifradas, sem markup sobre tokens.</li>
+            </ul>
+
+            <h2>Como configurar (passo a passo)</h2>
+            <ol>
+                <li>Crie uma chave no gateway (ex.: <code>agf_...</code>) e cadastre suas chaves BYOK dos provedores.</li>
+                <li>Na ferramenta (Cursor ou cliente compatível com OpenAI), abra as configurações de modelo/API.</li>
+                <li>Defina a <strong>base URL</strong> para o endpoint do gateway — no AegisFlow, <code>https://aegisflow.tech/v1</code> — e use a sua chave do gateway.</li>
+                <li>Pronto: o time continua trabalhando igual, e o roteamento + cache passam a atuar por baixo dos panos.</li>
+            </ol>
+            <p>Veja os detalhes na <a href="/documentacao">documentação do AegisFlow</a> — a integração leva cerca de 1 minuto e não exige refatorar nada.</p>
+
+            <h2>Quanto dá para economizar</h2>
+            <p>Como boa parte das requisições de assistentes de código são tarefas simples roteadas hoje para modelos caros, empresas costumam ver redução de 50% a 70% na fatura ao adotar roteamento por custo e cache — mantendo os modelos premium disponíveis para o que realmente importa.</p>
+
+            <div class="article-cta glass">
+                <h2>Corte o custo da IA da sua engenharia</h2>
+                <p>Aponte Cursor, Copilot ou seu cliente compatível com OpenAI para o AegisFlow e simule sua economia em menos de 1 minuto.</p>
+                <a href="/#simulador" class="btn btn-primary">Calcular minha economia</a>
+            </div>
+
+            <div class="related">
+                <h3>Continue lendo</h3>
+                <a href="/artigos/como-reduzir-custos-de-ia-guia-para-ctos">Como reduzir custos de IA sem perder qualidade: guia para CTOs →</a>
+                <a href="/artigos/o-que-e-llm-gateway-ai-proxy">O que é um LLM Gateway (AI Proxy)? →</a>
+            </div>
+        </div>
+    </article>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-top">
+                <a href="/" class="logo"><span class="mark">∞</span><span>AegisFlow</span></a>
+                <div class="footer-links">
+                    <a href="/termos">Termos</a>
+                    <a href="/privacidade">Privacidade &amp; LGPD</a>
+                    <a href="/artigos">Artigos</a>
+                    <a href="/documentacao">Documentação</a>
+                </div>
+            </div>
+            <div class="copy">© 2026 AegisFlow. Chaves BYOK cifradas em repouso — nunca armazenadas em texto plano. Zero markup sobre tokens.</div>
+        </div>
+    </footer>
+</body>
+</html>

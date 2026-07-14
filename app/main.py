@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import structlog
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
@@ -32,6 +32,16 @@ from app.logging_config import configure_logging, get_logger
 from app.metrics import render_prometheus
 
 PUBLIC_DIR = Path(__file__).parent / "public"
+
+# Artigos do blog: slug (URL) -> arquivo em public/. Usado nas rotas e no sitemap.
+ARTICLES = {
+    "melhor-ferramenta-otimizacao-de-tokens-de-ia-no-brasil": "artigo-otimizacao-tokens.html",
+    "token-maxxing-vazamento-de-caixa-em-ia": "artigo-token-maxxing.html",
+    "o-que-e-llm-gateway-ai-proxy": "artigo-llm-gateway.html",
+    "como-reduzir-custos-de-ia-guia-para-ctos": "artigo-reduzir-custos-ia.html",
+    "ia-e-lgpd-como-usar-llms-em-conformidade": "artigo-ia-lgpd.html",
+    "reduzir-custo-cursor-copilot-empresa": "artigo-cursor-copilot.html",
+}
 
 
 @asynccontextmanager
@@ -115,24 +125,17 @@ def create_app() -> FastAPI:
     async def docs_page() -> FileResponse:
         return _html("docs.html")
 
-    # Blog / artigos (SEO). URLs "bonitas" mapeadas para arquivos em public/.
+    # Blog / artigos (SEO). URLs "bonitas" mapeadas para arquivos em public/ via ARTICLES.
     @app.get("/artigos", include_in_schema=False)
     async def articles_index() -> FileResponse:
         return _html("artigos.html")
 
-    @app.get(
-        "/artigos/melhor-ferramenta-otimizacao-de-tokens-de-ia-no-brasil",
-        include_in_schema=False,
-    )
-    async def article_tokens() -> FileResponse:
-        return _html("artigo-otimizacao-tokens.html")
-
-    @app.get(
-        "/artigos/token-maxxing-vazamento-de-caixa-em-ia",
-        include_in_schema=False,
-    )
-    async def article_token_maxxing() -> FileResponse:
-        return _html("artigo-token-maxxing.html")
+    @app.get("/artigos/{slug}", include_in_schema=False)
+    async def article(slug: str) -> FileResponse:
+        filename = ARTICLES.get(slug)
+        if filename is None:
+            raise HTTPException(status_code=404, detail="Artigo não encontrado")
+        return _html(filename)
 
     @app.get("/termos", include_in_schema=False)
     async def terms_page() -> FileResponse:
@@ -151,15 +154,9 @@ def create_app() -> FastAPI:
     @app.get("/sitemap.xml", include_in_schema=False)
     async def sitemap() -> PlainTextResponse:
         base = "https://aegisflow.tech"
-        paths = [
-            ("/", "1.0"),
-            ("/artigos", "0.8"),
-            ("/artigos/melhor-ferramenta-otimizacao-de-tokens-de-ia-no-brasil", "0.9"),
-            ("/artigos/token-maxxing-vazamento-de-caixa-em-ia", "0.9"),
-            ("/documentacao", "0.6"),
-            ("/termos", "0.3"),
-            ("/privacidade", "0.3"),
-        ]
+        paths = [("/", "1.0"), ("/artigos", "0.8")]
+        paths += [(f"/artigos/{slug}", "0.9") for slug in ARTICLES]
+        paths += [("/documentacao", "0.6"), ("/termos", "0.3"), ("/privacidade", "0.3")]
         urls = "".join(
             f"<url><loc>{base}{p}</loc><changefreq>weekly</changefreq>"
             f"<priority>{prio}</priority></url>"

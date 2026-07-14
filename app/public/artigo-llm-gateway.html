@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>O que é um LLM Gateway (AI Proxy)? Guia Definitivo | AegisFlow</title>
+    <meta name="description" content="Guia definitivo sobre LLM Gateway (AI Proxy): o que é, como funciona, para que serve e como reduz custos de IA com roteamento por custo, cache semântico e BYOK. Em português.">
+    <meta name="keywords" content="llm gateway, ai proxy, o que é llm gateway, gateway de IA, proxy de LLM, roteamento de modelos, cache semântico, BYOK">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://aegisflow.tech/artigos/o-que-e-llm-gateway-ai-proxy">
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="AegisFlow">
+    <meta property="og:locale" content="pt_BR">
+    <meta property="og:url" content="https://aegisflow.tech/artigos/o-que-e-llm-gateway-ai-proxy">
+    <meta property="og:image" content="https://aegisflow.tech/static/og-image.png">
+    <meta name="twitter:image" content="https://aegisflow.tech/static/og-image.png">
+    <meta property="og:title" content="O que é um LLM Gateway (AI Proxy)? Guia Definitivo">
+    <meta property="og:description" content="O que é, como funciona e por que um LLM Gateway reduz custos de IA — com roteamento por custo, cache semântico e BYOK.">
+    <meta property="article:published_time" content="2026-07-14">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="stylesheet" href="/static/styles.css?v=4">
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Article",
+      "headline": "O que é um LLM Gateway (AI Proxy)? Guia Definitivo",
+      "description": "Guia definitivo sobre LLM Gateway (AI Proxy): o que é, como funciona e como reduz custos de IA.",
+      "inLanguage": "pt-BR",
+      "datePublished": "2026-07-14",
+      "dateModified": "2026-07-14",
+      "author": { "@type": "Organization", "name": "AegisFlow" },
+      "publisher": { "@type": "Organization", "name": "AegisFlow", "url": "https://aegisflow.tech/" },
+      "mainEntityOfPage": { "@type": "WebPage", "@id": "https://aegisflow.tech/artigos/o-que-e-llm-gateway-ai-proxy" }
+    }
+    </script>
+</head>
+<body>
+    <div class="bg-blobs"><div class="blob b1"></div><div class="blob b2"></div></div>
+
+    <nav class="nav glass">
+        <div class="container nav-inner">
+            <a href="/" class="logo"><span class="mark">∞</span><span>AegisFlow</span></a>
+            <div class="nav-links">
+                <a href="/#recursos">Recursos</a>
+                <a href="/artigos">Artigos</a>
+                <a href="/documentacao">Documentação</a>
+            </div>
+            <div class="nav-cta"><a href="/#interesse" class="btn btn-primary">Tenho interesse</a></div>
+        </div>
+    </nav>
+
+    <article class="article-shell">
+        <div class="breadcrumb"><a href="/">Início</a> › <a href="/artigos">Artigos</a> › LLM Gateway</div>
+        <div class="article-body">
+            <h1>O que é um LLM Gateway (AI Proxy)? Guia definitivo</h1>
+            <p class="article-meta">Publicado em 14 de julho de 2026 · AegisFlow</p>
+
+            <p class="lead">Conforme as empresas colocam Inteligência Artificial em produção, surge uma nova peça de infraestrutura entre as aplicações e os provedores de IA: o <strong>LLM Gateway</strong> — também chamado de <strong>AI Proxy</strong>. Neste guia você entende o que é, como funciona e por que ele virou item obrigatório para quem quer controlar custo, segurança e confiabilidade da IA.</p>
+
+            <h2>Definição: o que é um LLM Gateway</h2>
+            <p>Um LLM Gateway é uma camada de software que fica <strong>entre a sua aplicação e as APIs dos modelos de linguagem</strong> (OpenAI, Anthropic, Google, modelos open-source como Llama e Qwen, etc.). Em vez de cada serviço chamar o provedor diretamente, todas as requisições passam por um ponto único — o gateway — que centraliza controle, políticas e otimizações.</p>
+            <p>É o mesmo papel que um API Gateway cumpre para microsserviços, só que especializado nas particularidades de LLMs: tokens, custo por modelo, streaming, cache e provedores múltiplos.</p>
+
+            <h2>Para que serve? Os problemas que ele resolve</h2>
+            <p>Sem um gateway, cada equipe integra a IA do seu jeito, e a empresa perde visibilidade e dinheiro. Um LLM Gateway resolve:</p>
+            <ul>
+                <li><strong>Custo descontrolado:</strong> usar sempre o modelo mais caro para qualquer tarefa (o chamado <a href="/artigos/token-maxxing-vazamento-de-caixa-em-ia">Token Maxxing</a>) infla a fatura. O gateway aplica <a href="/artigos/como-reduzir-custos-de-ia-guia-para-ctos">estratégias de redução de custo</a> de forma central.</li>
+                <li><strong>Falta de padronização:</strong> uma única API (geralmente compatível com o formato da OpenAI) para falar com qualquer modelo, sem reescrever código.</li>
+                <li><strong>Segurança das chaves:</strong> centraliza e protege as chaves de API dos provedores, em vez de espalhá-las por repositórios e variáveis de ambiente.</li>
+                <li><strong>Confiabilidade:</strong> fallback automático entre provedores quando um cai ou atinge rate limit.</li>
+                <li><strong>Observabilidade:</strong> logs de uso, custo e latência por modelo, tenant e período.</li>
+            </ul>
+
+            <h2>Como funciona por dentro</h2>
+            <p>Quando uma requisição chega ao gateway, ela passa por uma cadeia de etapas antes de (talvez) chegar ao provedor:</p>
+            <ol>
+                <li><strong>Autenticação e limites:</strong> valida a chave da aplicação e aplica rate limit/quota.</li>
+                <li><strong>Cache semântico:</strong> verifica se uma pergunta parecida já foi respondida. Se sim, devolve na hora, a custo zero. (Veja <a href="/artigos/token-maxxing-vazamento-de-caixa-em-ia">por que a repetição custa caro</a>.)</li>
+                <li><strong>Roteamento por custo:</strong> classifica a complexidade do prompt e escolhe o modelo mais barato que resolve a tarefa.</li>
+                <li><strong>Injeção de credencial (BYOK):</strong> usa a chave do provedor da própria empresa, descriptografada só em memória.</li>
+                <li><strong>Execução e fallback:</strong> chama o provedor, com retry/fallback se necessário, e faz streaming da resposta.</li>
+                <li><strong>Registro:</strong> grava tokens, custo e latência para relatórios.</li>
+            </ol>
+
+            <h2>Recursos que separam um bom gateway</h2>
+            <h3>Roteamento por custo (model routing)</h3>
+            <p>O gateway lê o prompt e envia tarefas simples para modelos baratos e tarefas complexas para modelos premium — de forma transparente. Esse é o principal vetor de economia.</p>
+            <h3>Cache semântico</h3>
+            <p>Usa embeddings e busca vetorial para reconhecer perguntas semanticamente iguais, mesmo com palavras diferentes, e evitar pagar duas vezes.</p>
+            <h3>BYOK (Bring Your Own Key)</h3>
+            <p>Você conecta suas próprias chaves dos provedores; o gateway não revende tokens nem cobra pedágio. Melhor para custo e para segurança/LGPD.</p>
+
+            <h2>LLM Gateway vs chamar a API direto</h2>
+            <p>Chamar o provedor diretamente é simples no começo, mas não escala: sem controle central, o custo cresce, as chaves se multiplicam e não há visibilidade. O gateway adiciona uma camada fina de orquestração que se paga rapidamente em economia e segurança — sem exigir que os desenvolvedores mudem sua forma de trabalhar (basta trocar a <code>base_url</code>).</p>
+
+            <h2>Onde o AegisFlow entra</h2>
+            <p>O <strong>AegisFlow</strong> é um LLM Gateway BYOK feito para empresas brasileiras: roteamento por custo, cache semântico, chaves cifradas com AES-256, dados no Brasil e conformidade com a LGPD. A integração leva cerca de 1 minuto — você só troca a <code>base_url</code> da sua aplicação.</p>
+
+            <div class="article-cta glass">
+                <h2>Quanto sua empresa pode economizar?</h2>
+                <p>Descubra em menos de 1 minuto quanto um LLM Gateway com roteamento por custo reduziria a sua fatura de IA.</p>
+                <a href="/#simulador" class="btn btn-primary">Calcular minha economia</a>
+            </div>
+
+            <div class="related">
+                <h3>Continue lendo</h3>
+                <a href="/artigos/como-reduzir-custos-de-ia-guia-para-ctos">Como Reduzir Custos de IA sem Perder Qualidade: Guia para CTOs →</a>
+                <a href="/artigos/token-maxxing-vazamento-de-caixa-em-ia">O que é Token Maxxing e como ele drena seu caixa →</a>
+                <a href="/artigos/ia-e-lgpd-como-usar-llms-em-conformidade">IA e LGPD: como usar LLMs sem violar a lei de dados →</a>
+            </div>
+        </div>
+    </article>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-top">
+                <a href="/" class="logo"><span class="mark">∞</span><span>AegisFlow</span></a>
+                <div class="footer-links">
+                    <a href="/termos">Termos</a>
+                    <a href="/privacidade">Privacidade &amp; LGPD</a>
+                    <a href="/artigos">Artigos</a>
+                    <a href="/documentacao">Documentação</a>
+                </div>
+            </div>
+            <div class="copy">© 2026 AegisFlow. Chaves BYOK cifradas em repouso — nunca armazenadas em texto plano. Zero markup sobre tokens.</div>
+        </div>
+    </footer>
+</body>
+</html>

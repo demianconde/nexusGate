@@ -75,11 +75,15 @@ class SemanticCache:
         self, tenant_id: str, embedding: list[float] | None, response: CachedResponse
     ) -> None:
         """Guarda a resposta usando o embedding já calculado no lookup (sem recalcular)."""
-        if embedding is None or not get_settings().cache_enabled or not response.content:
+        settings = get_settings()
+        if embedding is None or not settings.cache_enabled or not response.content:
             return
-        self._store.setdefault(tenant_id, []).append(
-            _Entry(embedding=embedding, response=response, ts=time.time())
-        )
+        entries = self._store.setdefault(tenant_id, [])
+        entries.append(_Entry(embedding=embedding, response=response, ts=time.time()))
+        # Teto por tenant (anti-DoS de memória): descarta os mais antigos.
+        overflow = len(entries) - settings.cache_max_entries
+        if overflow > 0:
+            del entries[:overflow]
 
 
 _cache = SemanticCache()

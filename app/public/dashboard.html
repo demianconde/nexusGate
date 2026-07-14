@@ -493,7 +493,7 @@
                 try { cfg = await (await fetch('/public-config')).json(); } catch (e) { cfg = { configured: false }; }
 
                 token = localStorage.getItem('nexus_token');
-                const isDev = cfg.dev_mode && cfg.dev_token && token === cfg.dev_token;
+                const isDev = cfg.dev_mode && token === 'dev-local-access';
 
                 // Modo dev: não toca no Supabase (funciona 100% offline).
                 if (cfg.configured && !isDev) {

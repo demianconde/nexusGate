@@ -78,11 +78,12 @@
                     showMsg('Não foi possível carregar a configuração do servidor.', 'error');
                     return;
                 }
-                // Modo dev: botão para entrar sem login.
-                if (cfg.dev_mode && cfg.dev_token) {
+                // Modo dev: botão para entrar sem login. O sentinela só é aceito pelo
+                // backend quando o bypass está ligado (jamais em produção).
+                if (cfg.dev_mode) {
                     document.getElementById('devWrap').style.display = 'block';
                     document.getElementById('devBtn').addEventListener('click', () => {
-                        localStorage.setItem('nexus_token', cfg.dev_token);
+                        localStorage.setItem('nexus_token', 'dev-local-access');
                         window.location.href = '/dashboard';
                     });
                 }

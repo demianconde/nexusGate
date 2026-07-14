@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hmac
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -14,7 +15,6 @@ from fastapi.staticfiles import StaticFiles
 
 from app import __version__
 from app.api import admin, billing, chat, health, provider_keys, proxy, usage
-from app.auth.supabase import DEV_ACCESS_TOKEN
 from app.config import get_settings
 from app.logging_config import configure_logging, get_logger
 from app.metrics import render_prometheus
@@ -28,17 +28,27 @@ async def lifespan(app: FastAPI):
     configure_logging(level=settings.log_level, json_output=settings.log_json)
     log = get_logger("nexusgate")
     log.info("startup", version=__version__, env=settings.env)
+    if settings.dev_bypass_enabled:
+        log.warning(
+            "DEV_BYPASS_ATIVO: login pode ser contornado. NUNCA use em produção "
+            "(defina NEXUS_ENV=production e NEXUS_DEV_MODE=false)."
+        )
     yield
     log.info("shutdown")
 
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    # Em produção, esconde a documentação interativa (reduz o mapa da API p/ atacante).
+    docs_kwargs: dict = {}
+    if settings.is_production:
+        docs_kwargs = {"docs_url": None, "redoc_url": None, "openapi_url": None}
     app = FastAPI(
         title="NexusGate",
         version=__version__,
         description="LLM Gateway & Multi-Agent Proxy BYOK",
         lifespan=lifespan,
+        **docs_kwargs,
     )
 
     # Em produção, use uma allowlist (NEXUS_CORS_ORIGINS). Em dev, libera tudo.
@@ -84,24 +94,30 @@ def create_app() -> FastAPI:
     @app.get("/metrics", include_in_schema=False)
     async def metrics(request: Request) -> PlainTextResponse:
         token = settings.metrics_token
+        # Em produção, exige token; sem token configurado, o endpoint fica desabilitado.
+        if settings.is_production and not token:
+            return PlainTextResponse("not found", status_code=404)
         if token:
             auth = request.headers.get("authorization", "")
-            if auth != f"Bearer {token}":
+            if not hmac.compare_digest(auth, f"Bearer {token}"):
                 return PlainTextResponse("unauthorized", status_code=401)
         return PlainTextResponse(render_prometheus())
 
     @app.get("/public-config", include_in_schema=False)
     async def public_config() -> JSONResponse:
-        """Config pública (anon key do Supabase é destinada ao browser)."""
-        body = {
-            "supabase_url": settings.supabase_url or "",
-            "supabase_anon_key": settings.supabase_anon_key or "",
-            "configured": bool(settings.supabase_url and settings.supabase_anon_key),
-            "dev_mode": settings.dev_bypass_enabled,
-        }
-        if settings.dev_bypass_enabled:
-            body["dev_token"] = DEV_ACCESS_TOKEN
-        return JSONResponse(body)
+        """Config pública (anon key do Supabase é destinada ao browser).
+
+        NÃO expõe o token de bypass — o sentinela é público por natureza (JS) e só
+        funciona quando o backend está com dev_bypass ligado (jamais em produção).
+        """
+        return JSONResponse(
+            {
+                "supabase_url": settings.supabase_url or "",
+                "supabase_anon_key": settings.supabase_anon_key or "",
+                "configured": bool(settings.supabase_url and settings.supabase_anon_key),
+                "dev_mode": settings.dev_bypass_enabled,
+            }
+        )
 
     # Assets estáticos (css/js/vendor) em app/public/.
     app.mount("/static", StaticFiles(directory=PUBLIC_DIR), name="static")

@@ -20,7 +20,7 @@ _WINDOW_SECONDS = 60
 def _on_redis_error(exc: RedisError) -> None:
     """Fail-open (segue) ou fail-closed (503), conforme configuração."""
     _log.warning("rate_limit_unavailable", error=str(exc))
-    if get_settings().ratelimit_fail_closed:
+    if get_settings().ratelimit_fail_closed_effective:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Serviço de limites indisponível.",

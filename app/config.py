@@ -16,8 +16,8 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # App
-    env: str = Field(default="development", alias="NEXUS_ENV")
+    # App — default seguro: production (dev precisa setar NEXUS_ENV=development).
+    env: str = Field(default="production", alias="NEXUS_ENV")
     port: int = Field(default=8000, alias="NEXUS_PORT")
     log_level: str = Field(default="INFO", alias="NEXUS_LOG_LEVEL")
     log_json: bool = Field(default=False, alias="NEXUS_LOG_JSON")
@@ -55,6 +55,7 @@ class Settings(BaseSettings):
     cache_enabled: bool = Field(default=True, alias="NEXUS_CACHE_ENABLED")
     cache_threshold: float = Field(default=0.92, alias="NEXUS_CACHE_THRESHOLD")
     cache_ttl_seconds: int = Field(default=7 * 24 * 3600, alias="NEXUS_CACHE_TTL")
+    cache_max_entries: int = Field(default=1000, alias="NEXUS_CACHE_MAX_ENTRIES")  # teto por tenant
     embed_url: str = Field(default="http://localhost:11434", alias="NEXUS_EMBED_URL")
     embed_model: str | None = Field(default=None, alias="NEXUS_EMBED_MODEL")
 
@@ -74,6 +75,11 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def ratelimit_fail_closed_effective(self) -> bool:
+        """Em produção, falha fechado por padrão (Redis é obrigatório)."""
+        return self.ratelimit_fail_closed or self.is_production
 
 
 @lru_cache

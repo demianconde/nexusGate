@@ -63,16 +63,25 @@ async def change_plan(
     if plan_key not in PLANS:
         raise HTTPException(status_code=400, detail="Plano inválido.")
     tenant = await db.get(Tenant, user.tenant_id)
+    is_paid = PLANS[plan_key].price_brl > 0
+    settings = get_settings()
 
-    # Com Stripe configurado (e plano pago): retorna URL de checkout (Pix/boleto/cartão).
-    if stripe_enabled() and PLANS[plan_key].price_brl > 0:
-        origin = str(request.base_url).rstrip("/")
-        checkout = await create_checkout(
-            tenant, plan_key, f"{origin}/dashboard", f"{origin}/dashboard"
-        )
-        return {"status": "checkout", **checkout}
+    if is_paid:
+        # Plano pago exige pagamento: só via checkout Stripe.
+        if stripe_enabled():
+            origin = str(request.base_url).rstrip("/")
+            checkout = await create_checkout(
+                tenant, plan_key, f"{origin}/dashboard", f"{origin}/dashboard"
+            )
+            return {"status": "checkout", **checkout}
+        # Sem Stripe: em produção NÃO libera de graça; em dev, aplica p/ testes.
+        if settings.is_production:
+            raise HTTPException(
+                status_code=status.HTTP_501_NOT_IMPLEMENTED,
+                detail="Pagamento não configurado. Contate o suporte para assinar.",
+            )
 
-    # Modo dev / plano free: aplica direto.
+    # Plano free (downgrade) ou dev sem Stripe: aplica direto.
     await set_plan(db, tenant, plan_key)
     return {"status": "applied", "plan": plan_key}
 

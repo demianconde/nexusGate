@@ -34,6 +34,7 @@ from app.providers.service import (
 )
 from app.routing.pricing import cost_usd, infer_provider
 from app.routing.router import choose_route, estimate_complexity
+from app.security.net import validate_endpoint_async
 from app.security.pii import redact_messages
 from app.usage import record_usage
 
@@ -255,13 +256,17 @@ async def chat_completions(
                 upstream = upstream_for(att)
                 sent = False
                 try:
+                    # Anti-SSRF em runtime (fecha janela de DNS rebinding).
+                    await validate_endpoint_async(
+                        att.record.base_url, settings.allow_private_endpoints
+                    )
                     async for chunk in _service(att).stream(upstream, usage):
                         sent = True
                         collected.append(_delta_content(chunk))
                         yield chunk
                     ok = True
                     break  # sucesso
-                except (ProviderError, httpx.HTTPError) as exc:
+                except (ProviderError, httpx.HTTPError, ValueError) as exc:
                     if sent or idx == len(plan.attempts) - 1:
                         inc("nexus_errors_total")
                         yield openai_error_chunk(f"{type(exc).__name__}: {str(exc)[:300]}")
@@ -312,8 +317,9 @@ async def chat_completions(
     last_exc: Exception | None = None
     for idx, att in enumerate(plan.attempts):
         try:
+            await validate_endpoint_async(att.record.base_url, settings.allow_private_endpoints)
             result = await _service(att).complete(upstream_for(att))
-        except (ProviderError, httpx.HTTPError) as exc:
+        except (ProviderError, httpx.HTTPError, ValueError) as exc:
             last_exc = exc
             continue  # local/primário não deu conta → tenta o próximo
         model_used = result.usage.model or att.model
@@ -365,7 +371,10 @@ async def chat_completions(
         return JSONResponse(payload, headers=headers_for(att, escalated=idx > 0))
 
     inc("nexus_errors_total")
-    raise HTTPException(
-        status_code=status.HTTP_502_BAD_GATEWAY,
-        detail=f"Todos os provedores falharam. Último erro: {str(last_exc)[:300]}",
+    # Em produção não vaza detalhes internos do provedor/erro.
+    detail = (
+        "Falha ao processar a requisição no provedor."
+        if settings.is_production
+        else f"Todos os provedores falharam. Último erro: {str(last_exc)[:300]}"
     )
+    raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=detail)

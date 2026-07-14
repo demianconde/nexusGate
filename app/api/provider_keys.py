@@ -14,7 +14,7 @@ from app.crypto import encrypt_secret, is_configured
 from app.db.models import ProviderKey, User
 from app.db.session import get_db
 from app.providers.registry import KNOWN_PROVIDERS, is_local_url, resolve_endpoint
-from app.security.net import validate_endpoint
+from app.security.net import validate_endpoint_async
 
 from .schemas import ProviderKeyCreate, ProviderKeyInfo
 
@@ -88,7 +88,7 @@ async def create_provider_key(
 
     # Anti-SSRF: bloqueia endpoints em rede privada/local (salvo self-host).
     try:
-        validate_endpoint(base_url, get_settings().allow_private_endpoints)
+        await validate_endpoint_async(base_url, get_settings().allow_private_endpoints)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 

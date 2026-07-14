@@ -6,6 +6,7 @@ a menos que endpoints privados estejam explicitamente permitidos (self-host).
 
 from __future__ import annotations
 
+import asyncio
 import ipaddress
 import socket
 from urllib.parse import urlparse
@@ -40,12 +41,24 @@ def is_public_endpoint(base_url: str) -> bool:
     return all(not _is_blocked_ip(info[4][0]) for info in infos)
 
 
+_SSRF_MSG = (
+    "base_url aponta para rede privada/local, bloqueada por segurança (SSRF). "
+    "Em self-host, defina NEXUS_ALLOW_PRIVATE_ENDPOINTS=true."
+)
+
+
 def validate_endpoint(base_url: str, allow_private: bool) -> None:
     """Levanta ValueError se a base_url apontar para rede privada (e não permitido)."""
     if allow_private:
         return
     if not is_public_endpoint(base_url):
-        raise ValueError(
-            "base_url aponta para rede privada/local, bloqueada por segurança (SSRF). "
-            "Em self-host, defina NEXUS_ALLOW_PRIVATE_ENDPOINTS=true."
-        )
+        raise ValueError(_SSRF_MSG)
+
+
+async def validate_endpoint_async(base_url: str, allow_private: bool) -> None:
+    """Igual a validate_endpoint, mas resolve DNS fora do event loop (não bloqueia)."""
+    if allow_private:
+        return
+    ok = await asyncio.to_thread(is_public_endpoint, base_url)
+    if not ok:
+        raise ValueError(_SSRF_MSG)

@@ -3,8 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AegisFlow · Documentação</title>
-    <link rel="stylesheet" href="/static/styles.css?v=3">
+    <title>Documentação da API | AegisFlow — LLM Gateway compatível com OpenAI</title>
+    <meta name="description" content="Documentação do AegisFlow: gateway de LLM compatível com a API da OpenAI. Troque a base_url, use BYOK e roteie para o modelo mais barato que resolve. Quickstart, chat, embeddings e segurança.">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://aegisflow.tech/documentacao">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="AegisFlow">
+    <meta property="og:locale" content="pt_BR">
+    <meta property="og:url" content="https://aegisflow.tech/documentacao">
+    <meta property="og:title" content="Documentação da API | AegisFlow">
+    <meta property="og:description" content="Gateway de LLM compatível com OpenAI: troque a base_url, use BYOK e roteie para o modelo mais barato que resolve.">
+    <meta property="og:image" content="https://aegisflow.tech/static/og-image.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content="https://aegisflow.tech/static/og-image.png">
+    <link rel="stylesheet" href="/static/styles.css?v=4">
 </head>
 <body>
     <div class="bg-blobs"><div class="blob b1"></div><div class="blob b2"></div></div>
@@ -56,7 +68,7 @@
                     <li><strong>Plano de dados</strong> (suas aplicações): autentica com uma <strong>chave do AegisFlow</strong> no header <code>x-api-key</code>. É por aqui que passam as chamadas de IA.</li>
                     <li><strong>Painel</strong> (você/seu time): login via Supabase para gerenciar chaves, credenciais BYOK, ver uso e cobrança.</li>
                 </ul>
-                <div class="doc-note">Base URL: <code>https://api.aegisflow.com.br/v1</code> (produção) — em dev, <code>http://localhost:8000/v1</code>.</div>
+                <div class="doc-note">Base URL: <code>https://aegisflow.tech/v1</code> (produção) — em dev, <code>http://localhost:8000/v1</code>.</div>
             </section>
 
             <section class="doc-card glass" id="auth">
@@ -72,7 +84,7 @@
                 <div class="doc-pre"><code>from openai import OpenAI
 
 client = OpenAI(
-    base_url="https://api.aegisflow.com.br/v1",
+    base_url="https://aegisflow.tech/v1",
     api_key="agf_a1b2c3d4.•••••",   # sua chave do AegisFlow
 )
 
@@ -88,7 +100,7 @@ print(resp.choices[0].message.content)</code></div>
                 <div class="doc-endpoint"><span class="doc-method post">POST</span> /v1/chat/completions</div>
                 <p>Proxy compatível com o formato OpenAI. Resolve a credencial BYOK do tenant, chama o provedor real (qualquer LLM, na nuvem ou local) e devolve a resposta. Suporta <strong>streaming (SSE)</strong> com <code>"stream": true</code>.</p>
                 <p><strong>Campos:</strong> <code>model</code>, <code>messages</code>, <code>provider</code> (opcional), <code>stream</code>, <code>max_tokens</code>, <code>temperature</code>, <code>fallback</code>.</p>
-                <div class="doc-pre"><code>curl https://api.aegisflow.com.br/v1/chat/completions \
+                <div class="doc-pre"><code>curl https://aegisflow.tech/v1/chat/completions \
   -H "x-api-key: agf_..." -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-4o-mini",
@@ -134,7 +146,7 @@ print(resp.choices[0].message.content)</code></div>
                 <h2><span class="num">9</span> Embeddings <span class="doc-tag">plano de dados</span></h2>
                 <div class="doc-endpoint"><span class="doc-method post">POST</span> /v1/embeddings</div>
                 <p>Gera embeddings via BYOK (OpenAI-compatível ou Ollama). Retorna no formato OpenAI.</p>
-                <div class="doc-pre"><code>curl https://api.aegisflow.com.br/v1/embeddings \
+                <div class="doc-pre"><code>curl https://aegisflow.tech/v1/embeddings \
   -H "x-api-key: agf_..." -H "Content-Type: application/json" \
   -d '{"provider": "openai", "model": "text-embedding-3-small", "input": "olá"}'</code></div>
             </section>

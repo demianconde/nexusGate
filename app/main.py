@@ -134,6 +134,14 @@ def create_app() -> FastAPI:
     async def article_token_maxxing() -> FileResponse:
         return _html("artigo-token-maxxing.html")
 
+    @app.get("/termos", include_in_schema=False)
+    async def terms_page() -> FileResponse:
+        return _html("termos.html")
+
+    @app.get("/privacidade", include_in_schema=False)
+    async def privacy_page() -> FileResponse:
+        return _html("privacidade.html")
+
     @app.get("/robots.txt", include_in_schema=False)
     async def robots() -> PlainTextResponse:
         return PlainTextResponse(
@@ -149,6 +157,8 @@ def create_app() -> FastAPI:
             ("/artigos/melhor-ferramenta-otimizacao-de-tokens-de-ia-no-brasil", "0.9"),
             ("/artigos/token-maxxing-vazamento-de-caixa-em-ia", "0.9"),
             ("/documentacao", "0.6"),
+            ("/termos", "0.3"),
+            ("/privacidade", "0.3"),
         ]
         urls = "".join(
             f"<url><loc>{base}{p}</loc><changefreq>weekly</changefreq>"

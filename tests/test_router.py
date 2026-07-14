@@ -15,9 +15,16 @@ class FakeKey:
 
 
 def test_estimate_complexity():
+    # 3 níveis por pontuação: baixa / média / alta.
     assert estimate_complexity([{"content": "some um mais um"}]) == "low"
-    assert estimate_complexity([{"content": "Projete a arquitetura de um sistema"}]) == "high"
-    assert estimate_complexity([{"content": "x" * 7000}]) == "high"
+    assert (
+        estimate_complexity([{"content": "Projete a arquitetura de um sistema distribuído"}])
+        == "high"
+    )
+    # médio: feature com framework (React + Hooks), sem sinal de alta complexidade.
+    assert (
+        estimate_complexity([{"content": "Crie um componente em React usando Hooks"}]) == "medium"
+    )
 
 
 def test_simple_prefers_local():

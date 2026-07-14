@@ -16,6 +16,8 @@ ignore = ["B008"]
 [tool.ruff.lint.per-file-ignores]
 # Migrations do Alembic costumam ter linhas longas (create_table); tudo bem.
 "alembic/versions/*" = ["E501"]
+# Scripts utilitários (datasets, geração de assets) podem ter linhas longas.
+"scripts/*" = ["E501"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

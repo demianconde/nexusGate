@@ -23,9 +23,11 @@ _log = get_logger("classifier")
 
 _SYSTEM_PROMPT = (
     "Você classifica a COMPLEXIDADE de uma tarefa enviada a um modelo de código/IA. "
-    "Responda APENAS com uma palavra: 'high' ou 'low'. "
+    "Responda APENAS com uma palavra: 'high', 'medium' ou 'low'. "
     "'high' = arquitetura, design de sistema, raciocínio complexo, matemática, "
     "migração ampla, decisões de infraestrutura. "
+    "'medium' = implementar uma função/componente, corrigir um bug não trivial, "
+    "integrar algo, refatorar um trecho. "
     "'low' = tarefas simples e rotineiras (regex, formatação, testes triviais, "
     "pequenos ajustes, perguntas diretas)."
 )
@@ -63,6 +65,8 @@ async def _classify_with_llm(messages: list[dict]) -> str | None:
 
     if "high" in out:
         return "high"
+    if "medium" in out or "médi" in out:
+        return "medium"
     if "low" in out:
         return "low"
     _log.warning("classifier_unexpected_output", output=out[:40])

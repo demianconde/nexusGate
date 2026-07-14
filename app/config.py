@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -35,17 +36,36 @@ class Settings(BaseSettings):
 
     @field_validator("database_url")
     @classmethod
-    def _ensure_async_driver(cls, v: str) -> str:
-        """Aceita a URL nativa de provedores (Railway/Supabase/Heroku), que vem como
-        ``postgres://`` ou ``postgresql://``, e garante o driver async (``asyncpg``)
-        exigido pelo SQLAlchemy/Alembic. URLs que já trazem driver (``+asyncpg``,
-        ``+psycopg``) passam intactas.
+    def _normalize_db_url(cls, v: str) -> str:
+        """Normaliza a ``DATABASE_URL`` nativa de provedores (Fly.io/Supabase/Railway/
+        Heroku) para o driver async e remove parâmetros estilo libpq que o ``asyncpg``
+        não entende.
+
+        - ``postgres://`` / ``postgresql://`` → ``postgresql+asyncpg://``
+        - ``sslmode=disable|allow|prefer`` → removido (asyncpg não usa SSL por padrão;
+          é o caso da rede interna do Fly, ``.flycast``)
+        - ``sslmode=require|verify-*`` → ``ssl=true`` (formato aceito pelo asyncpg)
+        - ``channel_binding`` → removido
+        URLs que já trazem driver (``+asyncpg``, ``+psycopg``) mantêm o esquema.
         """
         if v.startswith("postgres://"):  # esquema legado (Heroku)
             v = "postgresql://" + v[len("postgres://") :]
         if v.startswith("postgresql://"):  # sem driver → adiciona asyncpg
             v = "postgresql+asyncpg://" + v[len("postgresql://") :]
-        return v
+
+        parts = urlsplit(v)
+        if not parts.query:
+            return v
+        kept: list[tuple[str, str]] = []
+        for key, val in parse_qsl(parts.query, keep_blank_values=True):
+            if key == "channel_binding":
+                continue
+            if key == "sslmode":
+                if val.lower() in ("require", "verify-ca", "verify-full"):
+                    kept.append(("ssl", "true"))
+                continue  # disable/allow/prefer: asyncpg dispensa o parâmetro
+            kept.append((key, val))
+        return urlunsplit(parts._replace(query=urlencode(kept)))
 
     # Supabase (Fase 1)
     supabase_url: str | None = Field(default=None, alias="SUPABASE_URL")

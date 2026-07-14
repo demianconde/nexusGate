@@ -1,0 +1,39 @@
+# fly.toml — AegisFlow (região São Paulo / gru = dados no Brasil)
+# Se o nome "aegisflow" já estiver em uso no Fly, troque a linha `app` abaixo.
+app = "aegisflow"
+primary_region = "gru"
+
+[build]
+
+# Migrations rodam UMA vez, antes do deploy ir ao ar. Se falharem, o deploy aborta
+# (melhor que subir quebrado). No runtime roda só o uvicorn (ver [processes]).
+[deploy]
+  release_command = "alembic upgrade head"
+
+# Variáveis NÃO sensíveis. Segredos (DATABASE_URL, AEGIS_MASTER_KEY) vão via `fly secrets set`.
+[env]
+  AEGIS_ENV = "production"
+  AEGIS_LOG_JSON = "true"
+  AEGIS_CORS_ORIGINS = "https://aegisflow.tech,https://www.aegisflow.tech"
+
+[processes]
+  app = "uvicorn app.main:app --host 0.0.0.0 --port 8000"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 1        # landing sempre "quente" (0 = mais barato, mas com cold start)
+  processes = ["app"]
+
+  [[http_service.checks]]
+    interval = "15s"
+    timeout = "3s"
+    grace_period = "20s"
+    method = "GET"
+    path = "/health"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

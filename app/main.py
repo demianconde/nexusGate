@@ -115,6 +115,53 @@ def create_app() -> FastAPI:
     async def docs_page() -> FileResponse:
         return _html("docs.html")
 
+    # Blog / artigos (SEO). URLs "bonitas" mapeadas para arquivos em public/.
+    @app.get("/artigos", include_in_schema=False)
+    async def articles_index() -> FileResponse:
+        return _html("artigos.html")
+
+    @app.get(
+        "/artigos/melhor-ferramenta-otimizacao-de-tokens-de-ia-no-brasil",
+        include_in_schema=False,
+    )
+    async def article_tokens() -> FileResponse:
+        return _html("artigo-otimizacao-tokens.html")
+
+    @app.get(
+        "/artigos/token-maxxing-vazamento-de-caixa-em-ia",
+        include_in_schema=False,
+    )
+    async def article_token_maxxing() -> FileResponse:
+        return _html("artigo-token-maxxing.html")
+
+    @app.get("/robots.txt", include_in_schema=False)
+    async def robots() -> PlainTextResponse:
+        return PlainTextResponse(
+            "User-agent: *\nAllow: /\nSitemap: https://aegisflow.tech/sitemap.xml\n"
+        )
+
+    @app.get("/sitemap.xml", include_in_schema=False)
+    async def sitemap() -> PlainTextResponse:
+        base = "https://aegisflow.tech"
+        paths = [
+            ("/", "1.0"),
+            ("/artigos", "0.8"),
+            ("/artigos/melhor-ferramenta-otimizacao-de-tokens-de-ia-no-brasil", "0.9"),
+            ("/artigos/token-maxxing-vazamento-de-caixa-em-ia", "0.9"),
+            ("/documentacao", "0.6"),
+        ]
+        urls = "".join(
+            f"<url><loc>{base}{p}</loc><changefreq>weekly</changefreq>"
+            f"<priority>{prio}</priority></url>"
+            for p, prio in paths
+        )
+        xml = (
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+            f"{urls}</urlset>"
+        )
+        return PlainTextResponse(xml, media_type="application/xml")
+
     # Console do dono — rota "secreta" (não linkada em lugar nenhum). Aceita a
     # versão acentuada e a ASCII (a acentuada é percent-encoded pelo browser).
     @app.get("/gestaoaegis", include_in_schema=False)

@@ -59,9 +59,11 @@ class Settings(BaseSettings):
     embed_url: str = Field(default="http://localhost:11434", alias="NEXUS_EMBED_URL")
     embed_model: str | None = Field(default=None, alias="NEXUS_EMBED_MODEL")
 
-    # Stripe (Fase 5)
+    # Stripe (Fase 5) — em homologação use chaves de TESTE (sk_test_... / whsec_...).
     stripe_secret_key: str | None = Field(default=None, alias="STRIPE_SECRET_KEY")
     stripe_webhook_secret: str | None = Field(default=None, alias="STRIPE_WEBHOOK_SECRET")
+    # Métodos de pagamento do Checkout (assinatura): cartão é o confiável p/ recorrência.
+    stripe_payment_methods: str = Field(default="card", alias="NEXUS_STRIPE_PAYMENT_METHODS")
 
     @property
     def is_production(self) -> bool:

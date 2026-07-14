@@ -29,7 +29,8 @@ TASKS = [
     ("baixa", "gemini-3.1-flash-lite",
      "Sugira 6 categorias de despesa e 3 de receita para finanças pessoais."),
     ("média", "gemini-2.5-flash",
-     "Escreva funções Python para adicionar transação, calcular saldo e salvar/carregar em JSON. Conciso."),
+     "Escreva funções Python para adicionar transação, calcular saldo e "
+     "salvar/carregar em JSON. Conciso."),
     ("alta", "gemini-2.5-pro",
      "Projete a arquitetura de um sistema de finanças multiusuário: modelo de dados, "
      "módulos, relatórios mensais, metas e alertas. Detalhado."),

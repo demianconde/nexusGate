@@ -59,10 +59,15 @@ async def create_checkout(tenant: Tenant, plan_key: str, success_url: str, cance
 
     import stripe  # lazy: só quando configurado
 
-    stripe.api_key = get_settings().stripe_secret_key
+    settings = get_settings()
+    stripe.api_key = settings.stripe_secret_key
+    # Assinatura recorrente: Pix é one-time e NÃO suporta subscription no Stripe.
+    # Cartão é o método confiável p/ recorrência (boleto/outros via env, se habilitados).
+    methods = [m.strip() for m in settings.stripe_payment_methods.split(",") if m.strip()]
+    meta = {"tenant_id": str(tenant.id), "plan": plan_key}
     session = stripe.checkout.Session.create(
         mode="subscription",
-        payment_method_types=["card", "boleto", "pix"],
+        payment_method_types=methods or ["card"],
         line_items=[
             {
                 "price_data": {
@@ -75,7 +80,8 @@ async def create_checkout(tenant: Tenant, plan_key: str, success_url: str, cance
             }
         ],
         client_reference_id=str(tenant.id),
-        metadata={"tenant_id": str(tenant.id), "plan": plan_key},
+        metadata=meta,
+        subscription_data={"metadata": meta},  # p/ o webhook customer.subscription.updated
         success_url=success_url,
         cancel_url=cancel_url,
     )

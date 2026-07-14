@@ -159,6 +159,11 @@ class Subscription(Base):
     stripe_subscription_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     plan: Mapped[str] = mapped_column(String(50), nullable=False, default="free")
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="active")
+    current_period_start: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     current_period_end: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # Plano agendado (downgrade) que entra em vigor no vencimento do período atual.
+    pending_plan: Mapped[str | None] = mapped_column(String(50), nullable=True)

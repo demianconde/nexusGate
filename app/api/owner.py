@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -117,3 +117,16 @@ async def update_lead(
     lead.status = body.status
     await db.commit()
     return {"status": "ok"}
+
+
+@router.delete("/leads/{lead_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
+async def delete_lead(
+    lead_id: uuid.UUID,
+    _owner: dict = Depends(require_owner),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    lead = await db.get(Lead, lead_id)
+    if lead is not None:
+        await db.delete(lead)
+        await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

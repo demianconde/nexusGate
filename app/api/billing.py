@@ -8,6 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.supabase import get_current_user
 from app.billing.plans import PLANS, get_plan
 from app.billing.service import (
+    billing_state,
+    change_plan,
     create_checkout,
     monthly_request_count,
     set_plan,
@@ -28,6 +30,8 @@ async def get_billing(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     tenant = await db.get(Tenant, user.tenant_id)
+    state = await billing_state(db, tenant)
+    tenant = await db.get(Tenant, user.tenant_id)  # pode ter mudado ao aplicar downgrade vencido
     plan = get_plan(tenant.plan)
     used = await monthly_request_count(db, user.tenant_id)
     return {
@@ -38,6 +42,7 @@ async def get_billing(
         "used_this_month": used,
         "rpm": plan.rpm,
         "stripe_enabled": stripe_enabled(),
+        **state,
         "plans": [
             {
                 "key": p.key,
@@ -53,7 +58,7 @@ async def get_billing(
 
 
 @router.post("/admin/billing/plan")
-async def change_plan(
+async def change_plan_endpoint(
     body: dict,
     request: Request,
     user: User = Depends(get_current_user),
@@ -81,9 +86,9 @@ async def change_plan(
                 detail="Pagamento não configurado. Contate o suporte para assinar.",
             )
 
-    # Plano free (downgrade) ou dev sem Stripe: aplica direto.
-    await set_plan(db, tenant, plan_key)
-    return {"status": "applied", "plan": plan_key}
+    # Aplica a regra de proração (free/downgrade sempre; pago em dev sem Stripe).
+    effect = await change_plan(db, tenant, plan_key)
+    return {"status": "applied", "plan": plan_key, **effect}
 
 
 @router.post("/billing/webhook")

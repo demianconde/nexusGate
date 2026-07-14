@@ -168,10 +168,13 @@
             <div id="tab-cobranca" style="display:none">
                 <div class="stat-grid">
                     <div class="stat glass"><div class="k">Plano atual</div><div class="v" id="bPlan">—</div></div>
+                    <div class="stat glass"><div class="k">Vigência até</div><div class="v" id="bUntil">—</div></div>
                     <div class="stat glass"><div class="k">Requisições no mês</div><div class="v" id="bUsed">—</div></div>
                     <div class="stat glass"><div class="k">Quota mensal</div><div class="v" id="bQuota">—</div></div>
                 </div>
-                <p class="muted" id="bMode" style="font-size:0.8rem;margin-bottom:1rem"></p>
+                <div class="msg" id="bPending" style="display:none"></div>
+                <div class="msg" id="bChange" style="display:none"></div>
+                <p class="muted" id="bMode" style="font-size:0.8rem;margin:0.5rem 0 1rem"></p>
                 <div class="grid grid-pricing" id="plansContainer"></div>
             </div><!-- /tab-cobranca -->
         </div>
@@ -499,12 +502,19 @@
                 const res = await api('/v1/admin/billing');
                 if (!res.ok) throw new Error('falha ao carregar cobrança');
                 const b = await res.json();
+                const fmtDay = (iso) => iso ? new Date(iso).toLocaleDateString('pt-BR') : '—';
                 document.getElementById('bPlan').textContent = b.plan_label;
+                document.getElementById('bUntil').textContent = b.price_brl > 0 ? fmtDay(b.period_end) : '—';
                 document.getElementById('bUsed').textContent = fmtInt(b.used_this_month);
                 document.getElementById('bQuota').textContent = fmtInt(b.monthly_quota);
+                const pend = document.getElementById('bPending');
+                if (b.pending_plan) {
+                    pend.className = 'msg show warn';
+                    pend.textContent = 'Downgrade agendado: muda para ' + b.pending_plan_label + ' em ' + fmtDay(b.period_end) + ' (vencimento do plano atual).';
+                } else { pend.className = 'msg'; pend.style.display = 'none'; }
                 document.getElementById('bMode').textContent = b.stripe_enabled
                     ? 'Pagamento via Stripe (Pix, boleto ou cartão).'
-                    : 'Modo dev: a troca de plano é aplicada direto, sem cobrança.';
+                    : 'Modo dev: a troca de plano é aplicada direto, sem cobrança real.';
                 const cont = document.getElementById('plansContainer');
                 cont.innerHTML = b.plans.map(p => {
                     const current = p.key === b.plan;
@@ -525,14 +535,20 @@
 
             async function changePlan(plan) {
                 clearMsg();
+                const ch = document.getElementById('bChange');
                 try {
                     const res = await api('/v1/admin/billing/plan', { method: 'POST', body: JSON.stringify({ plan }) });
                     if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.detail || 'falha'); }
                     const r = await res.json();
                     if (r.status === 'checkout' && r.checkout_url) { window.location.href = r.checkout_url; return; }
-                    showMsg('Plano atualizado para ' + plan + '.', 'ok');
+                    const day = (iso) => iso ? new Date(iso).toLocaleDateString('pt-BR') : '';
+                    let msg = 'Plano atualizado.';
+                    if (r.effect === 'upgrade_immediate') msg = 'Upgrade imediato! Cobrança proporcional de R$ ' + (r.charge_brl||0).toLocaleString('pt-BR') + ' pelo tempo restante (vigência até ' + day(r.period_end) + ').';
+                    else if (r.effect === 'scheduled') msg = 'Downgrade agendado: o novo plano (R$ ' + (r.charge_brl||0).toLocaleString('pt-BR') + '/mês) começa em ' + day(r.starts_at) + ', no vencimento do atual.';
+                    else if (r.effect === 'immediate') msg = 'Plano ativado. Vigência até ' + day(r.period_end) + ' (R$ ' + (r.charge_brl||0).toLocaleString('pt-BR') + '/mês).';
+                    ch.className = 'msg show ok'; ch.textContent = msg;
                     await loadBilling();
-                } catch (err) { showMsg(err.message, 'error'); }
+                } catch (err) { ch.className = 'msg show error'; ch.textContent = err.message; }
             }
 
             // ----- Logs -----

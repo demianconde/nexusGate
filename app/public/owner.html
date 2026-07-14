@@ -110,13 +110,21 @@
                         + '<td>' + esc(l.company) + '</td>'
                         + '<td>' + esc(l.monthly_spend) + '</td>'
                         + '<td><span class="badge-status ' + (l.status==='converted'?'active':'revoked') + '">' + esc(l.status) + '</span></td>'
-                        + '<td><select class="input" style="font-size:0.75rem;padding:0.3rem" data-lead="' + l.id + '">'
+                        + '<td style="white-space:nowrap">'
+                        + '<select class="input" style="font-size:0.75rem;padding:0.3rem;width:auto;display:inline-block" data-lead="' + l.id + '">'
                         + ['new','contacted','converted','discarded'].map(s => '<option ' + (s===l.status?'selected':'') + '>' + s + '</option>').join('')
-                        + '</select></td></tr>';
+                        + '</select> '
+                        + '<button class="btn btn-danger btn-sm" data-del="' + l.id + '">Apagar</button>'
+                        + '</td></tr>';
                 }
                 c.innerHTML = h + '</tbody></table>';
                 c.querySelectorAll('[data-lead]').forEach(sel => sel.addEventListener('change', async () => {
                     await api('/v1/owner/leads/' + sel.getAttribute('data-lead'), { method: 'PATCH', body: JSON.stringify({ status: sel.value }) });
+                    loadAll();
+                }));
+                c.querySelectorAll('[data-del]').forEach(btn => btn.addEventListener('click', async () => {
+                    if (!confirm('Apagar este lead?')) return;
+                    await api('/v1/owner/leads/' + btn.getAttribute('data-del'), { method: 'DELETE' });
                     loadAll();
                 }));
             }

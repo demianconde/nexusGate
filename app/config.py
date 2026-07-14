@@ -96,6 +96,15 @@ class Settings(BaseSettings):
     embed_url: str = Field(default="http://localhost:11434", alias="AEGIS_EMBED_URL")
     embed_model: str | None = Field(default=None, alias="AEGIS_EMBED_MODEL")
 
+    # Roteamento (aegis-auto): como estimar a complexidade da tarefa.
+    #   "heuristic" (padrão): palavras-chave + tamanho, sem IA (rápido e grátis).
+    #   "classifier": um modelo leve (endpoint compatível com OpenAI) decide high/low;
+    #   se falhar/indisponível, cai automaticamente na heurística.
+    routing_mode: str = Field(default="heuristic", alias="AEGIS_ROUTING_MODE")
+    classifier_url: str | None = Field(default=None, alias="AEGIS_CLASSIFIER_URL")
+    classifier_model: str | None = Field(default=None, alias="AEGIS_CLASSIFIER_MODEL")
+    classifier_api_key: str | None = Field(default=None, alias="AEGIS_CLASSIFIER_API_KEY")
+
     # Stripe (Fase 5) — em homologação use chaves de TESTE (sk_test_... / whsec_...).
     stripe_secret_key: str | None = Field(default=None, alias="STRIPE_SECRET_KEY")
     stripe_webhook_secret: str | None = Field(default=None, alias="STRIPE_WEBHOOK_SECRET")

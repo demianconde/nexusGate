@@ -32,8 +32,9 @@ from app.providers.service import (
     now_ms,
     openai_error_chunk,
 )
+from app.routing.classifier import classify_complexity
 from app.routing.pricing import cost_usd, infer_provider
-from app.routing.router import choose_route, estimate_complexity
+from app.routing.router import choose_route
 from app.security.guardrails import blocked_term
 from app.security.net import validate_endpoint_async
 from app.security.pii import redact_messages, redact_pii
@@ -99,7 +100,7 @@ async def _plan(db: AsyncSession, tenant_id: uuid.UUID, body: ChatCompletionRequ
     if body.model == "aegis-auto":
         if not keys:
             raise HTTPException(400, "Nenhuma credencial de provedor cadastrada para rotear.")
-        complexity = estimate_complexity([m.model_dump() for m in body.messages])
+        complexity = await classify_complexity([m.model_dump() for m in body.messages])
         route = choose_route(complexity, keys)
         if route is None:
             raise HTTPException(

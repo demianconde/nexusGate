@@ -17,11 +17,18 @@ from typing import Protocol
 from app.providers.registry import KNOWN_PROVIDERS, is_local_url
 from app.routing.pricing import price_of
 
+# Sinais de tarefa complexa (PT + EN) — devs frequentemente escrevem prompts em inglês.
 _HIGH_PATTERN = re.compile(
+    # Português
     r"arquitetura|projete|projeto completo|design de sistema|infraestrutura|"
     r"planejamento|escalabilidade|microservi|multiusu|sistema completo|"
     r"refatore o sistema|migra[çc][aã]o|prova matem|demonstra[çc][aã]o|"
-    r"otimize a performance|threat model|modelagem de dados",
+    r"otimize a performance|modelagem de dados|alta disponibilidade|"
+    # Inglês
+    r"architecture|system design|design (a |an |the )?system|infrastructure|"
+    r"scalab|microservice|multi-?tenan|refactor the (whole|entire|)|migration|"
+    r"mathematical proof|prove that|optimize (the )?performance|threat model|"
+    r"data model|distributed system|concurrency|high availability|time complexity",
     re.IGNORECASE,
 )
 _HIGH_CHAR_THRESHOLD = 6000  # ~1500 tokens de entrada

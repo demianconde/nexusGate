@@ -13,7 +13,7 @@ from app.auth.supabase import get_current_user
 from app.db.models import User
 from app.db.session import get_db
 from app.routing.pricing import catalog
-from app.usage import recent_logs, usage_summary
+from app.usage import monthly_projection, recent_logs, usage_summary
 
 router = APIRouter(prefix="/v1/admin", tags=["admin"])
 
@@ -63,6 +63,18 @@ async def export_usage(
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=aegisflow-economia.csv"},
     )
+
+
+@router.get("/usage/projection")
+async def get_projection(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Projecao de consumo mensal: custo real vs custo se tudo rodasse no modelo mais caro.
+
+    Retorna dados diarios para grafico de barras/linha no dashboard.
+    """
+    return await monthly_projection(db, user.tenant_id)
 
 
 @router.get("/logs")

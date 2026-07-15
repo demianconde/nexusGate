@@ -120,3 +120,108 @@ async def usage_summary(db: AsyncSession, tenant_id: uuid.UUID) -> dict:
             "cost_saved_usd": round(total_saved, 6),
         },
     }
+
+
+async def monthly_projection(db: AsyncSession, tenant_id: uuid.UUID) -> dict:
+    """Projecao de consumo: custo real vs custo se tudo rodasse no modelo mais caro.
+
+    Retorna dados diarios do mes corrente para grafico de barras/linha:
+    - custo_real_diario: o que realmente gastou (com roteamento + cache)
+    - custo_projetado_diario: o que gastaria se todas as requisicoes usassem
+      o modelo mais caro disponivel (sem roteamento, sem cache)
+    - economia_diaria: diferenca entre os dois
+    """
+    from datetime import UTC, datetime, timedelta
+
+    now = datetime.now(UTC)
+    start_of_month = datetime(now.year, now.month, 1, tzinfo=UTC)
+
+    # Busca todos os logs do mes corrente
+    stmt = (
+        select(UsageLog)
+        .where(UsageLog.tenant_id == tenant_id, UsageLog.ts >= start_of_month)
+        .order_by(UsageLog.ts.asc())
+    )
+    rows = (await db.execute(stmt)).scalars().all()
+
+    # Determina o modelo mais caro usado pelo tenant (baseline para projecao)
+    most_expensive_model = "gpt-4o"  # default
+    max_price = 0.0
+    for r in rows:
+        inp, out = price_of(r.model_used)
+        total_price = inp + out
+        if total_price > max_price:
+            max_price = total_price
+            most_expensive_model = r.model_used
+
+    # Agrupa por dia
+    days: dict[str, dict] = {}
+    for r in rows:
+        day_key = r.ts.strftime("%Y-%m-%d") if r.ts else now.strftime("%Y-%m-%d")
+        if day_key not in days:
+            days[day_key] = {
+                "date": day_key,
+                "real_cost": 0.0,
+                "projected_cost": 0.0,
+                "requests": 0,
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "cache_hits": 0,
+            }
+        d = days[day_key]
+        d["real_cost"] += float(r.cost_usd)
+        # Projecao: quanto custaria se usasse o modelo mais caro
+        d["projected_cost"] += cost_usd(
+            most_expensive_model, r.prompt_tokens, r.completion_tokens
+        )
+        d["requests"] += 1
+        d["prompt_tokens"] += r.prompt_tokens
+        d["completion_tokens"] += r.completion_tokens
+        if r.cache_hit:
+            d["cache_hits"] += 1
+
+    # Preenche dias sem uso (para o grafico ficar continuo)
+    daily_data = []
+    current = start_of_month
+    while current <= now:
+        key = current.strftime("%Y-%m-%d")
+        if key in days:
+            d = days[key]
+            d["saved"] = round(d["projected_cost"] - d["real_cost"], 6)
+            daily_data.append(d)
+        else:
+            daily_data.append({
+                "date": key,
+                "real_cost": 0.0,
+                "projected_cost": 0.0,
+                "saved": 0.0,
+                "requests": 0,
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "cache_hits": 0,
+            })
+        current += timedelta(days=1)
+
+    # Totais do mes
+    total_real = sum(d["real_cost"] for d in daily_data)
+    total_projected = sum(d["projected_cost"] for d in daily_data)
+    total_requests = sum(d["requests"] for d in daily_data)
+    total_cache_hits = sum(d["cache_hits"] for d in daily_data)
+
+    return {
+        "baseline_model": most_expensive_model,
+        "daily": daily_data,
+        "totals": {
+            "real_cost_usd": round(total_real, 6),
+            "projected_cost_usd": round(total_projected, 6),
+            "saved_usd": round(total_projected - total_real, 6),
+            "savings_percent": round(
+                ((total_projected - total_real) / total_projected * 100) if total_projected > 0 else 0, 1
+            ),
+            "requests": total_requests,
+            "cache_hits": total_cache_hits,
+            "cache_hit_rate": round(
+                (total_cache_hits / total_requests * 100) if total_requests > 0 else 0, 1
+            ),
+        },
+    }

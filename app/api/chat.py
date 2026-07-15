@@ -189,9 +189,10 @@ async def chat_completions(
     settings = get_settings()
     tenant_id = ctx.tenant.id
     key = ctx.key
+    fail_open = body.fail_open
 
-    # Orçamento mensal por chave virtual.
-    if key.monthly_budget_usd is not None:
+    # Orçamento mensal por chave virtual (bypass em fail-open).
+    if not fail_open and key.monthly_budget_usd is not None:
         spent = await key_month_spend(db, key.id)
         if spent >= float(key.monthly_budget_usd):
             raise HTTPException(
@@ -235,8 +236,11 @@ async def chat_completions(
             detail="Requisição bloqueada pela política de conteúdo (guardrail).",
         )
 
-    # ---------- cache semântico ----------
-    cached, cache_emb = await cache.lookup(str(tenant_id), cache_text)
+    # ---------- cache semântico (bypass em fail-open) ----------
+    cached = None
+    cache_emb = None
+    if not fail_open:
+        cached, cache_emb = await cache.lookup(str(tenant_id), cache_text)
     if cached is not None:
         saved = cost_usd(cached.model, cached.prompt_tokens, cached.completion_tokens)
         await record_usage(
@@ -278,6 +282,8 @@ async def chat_completions(
             "x-aegis-request-id": request_id, "x-aegis-model": att.model,
             "x-aegis-provider": att.provider, "x-aegis-cache": "miss",
         }
+        if fail_open:
+            h["x-aegis-degraded"] = "true"
         if plan.routed:
             h["x-aegis-complexity"] = plan.complexity or ""
             h["x-aegis-routed"] = "escalated" if escalated else "auto"

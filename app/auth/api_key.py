@@ -1,9 +1,9 @@
 """Chaves de API do AegisFlow (x-api-key) usadas pelas apps clientes.
 
-Formato: ``agf_<8 hex>.<segredo>``. Guardamos apenas o prefixo (para lookup) e o
-hash SHA-256 da chave completa. O valor em claro só é mostrado uma vez, na criação.
+Formato: agf_<8 hex>.<segredo>. Guardamos apenas o prefixo (para lookup) e o
+hash SHA-256 da chave completa. O valor em claro so eh mostrado uma vez, na criacao.
 
-Suporta **chaves virtuais**: limites de rpm, orçamento mensal (USD) e allowlist de
+Suporta chaves virtuais: limites de rpm, orcamento mensal (USD) e allowlist de
 modelos por chave.
 """
 
@@ -33,7 +33,7 @@ class ApiContext:
 
 
 def generate_api_key() -> tuple[str, str, str]:
-    """Gera (chave_completa, prefixo, hash). A chave completa não é persistida."""
+    """Gera (chave_completa, prefixo, hash). A chave completa nao eh persistida."""
     prefix = _PREFIX_NAMESPACE + secrets.token_hex(4)  # ex.: agf_a1b2c3d4 (12 chars)
     secret = secrets.token_urlsafe(32)
     full_key = f"{prefix}.{secret}"
@@ -57,11 +57,11 @@ async def get_api_context(
     """Resolve tenant + chave da x-api-key e aplica limites (plano e chave virtual)."""
     if not x_api_key:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Header x-api-key é obrigatório"
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Header x-api-key eh obrigatorio"
         )
     prefix = _parse_prefix(x_api_key)
     if not prefix:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Chave de API inválida")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Chave de API invalida")
 
     result = await db.execute(
         select(AegisApiKey).where(
@@ -72,17 +72,17 @@ async def get_api_context(
     key = result.scalar_one_or_none()
     expected_hash = key.key_hash if key else "0" * 64
     if key is None or not hmac.compare_digest(expected_hash, hash_key(x_api_key)):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Chave de API inválida")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Chave de API invalida")
 
     tenant = await db.get(Tenant, key.tenant_id)
     if tenant is None or tenant.status != "active":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Tenant inativo")
 
     plan = get_plan(tenant.plan)
-    # Rate limit por minuto: chave virtual pode ter limite próprio (senão, o do plano).
+    # Rate limit por minuto: chave virtual pode ter limite proprio (senao, o do plano).
     effective_rpm = key.rpm_limit if key.rpm_limit is not None else plan.rpm
     await enforce_minute(f"key:{key.id}", effective_rpm)
-    # Quota mensal de requisições (nível tenant/plano).
+    # Quota mensal de requisicoes (nivel tenant/plano).
     await enforce_monthly_quota(str(tenant.id), plan.monthly_quota, plan.label)
 
     return ApiContext(tenant=tenant, key=key)

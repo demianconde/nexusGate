@@ -74,6 +74,11 @@ class ChatCompletionRequest(BaseModel):
     temperature: float | None = None
     # Cadeia de fallback: itens "provider:model" ou "model" tentados se o principal falhar.
     fallback: list[str] | None = None
+    # Modo fail-open: se true, o gateway opera em modo degradado em caso de falha de
+    # infraestrutura (Redis indisponível, etc.) — pula rate limit e cache, vai direto
+    # ao provedor. Ideal para clientes que preferem disponibilidade máxima sobre
+    # economia/controle. Headers de resposta incluem x-aegis-degraded: true.
+    fail_open: bool = False
 
 
 class EmbeddingsRequest(BaseModel):

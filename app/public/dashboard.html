@@ -135,6 +135,22 @@
                     <div class="stat glass"><div class="k">Economia por roteamento (aegis-auto)</div><div class="v" id="uSaved" style="color:var(--brand-300)">—</div></div>
                 </div>
 
+                <div class="panel glass" style="margin-bottom:1.5rem">
+                    <div class="panel-head">
+                        <h2>Consumo Mensal: Real vs Projetado (modelo único)</h2>
+                        <span class="muted" style="font-size:0.8rem" id="projBaseline"></span>
+                    </div>
+                    <div style="position:relative;width:100%;height:280px">
+                        <canvas id="projectionChart" style="width:100%;height:100%"></canvas>
+                    </div>
+                    <div class="stat-grid" style="margin-top:1rem">
+                        <div class="stat"><div class="k">Custo real (com roteamento + cache)</div><div class="v" id="projReal" style="color:var(--brand-300)">—</div></div>
+                        <div class="stat"><div class="k">Custo projetado (modelo único)</div><div class="v" id="projProjected">—</div></div>
+                        <div class="stat"><div class="k">Economia total</div><div class="v" id="projSaved" style="color:#10b981">—</div></div>
+                        <div class="stat"><div class="k">Cache hit rate</div><div class="v" id="projCacheRate">—</div></div>
+                    </div>
+                </div>
+
                 <div class="compare">
                     <div class="row-inline">
                         <label for="baselineSelect">Simular: e se <strong>tudo</strong> tivesse rodado no mesmo LLM →</label>
@@ -527,6 +543,158 @@
             }
             baselineSelect.addEventListener('change', updateComparison);
 
+            // ----- Gráfico de Projeção Mensal -----
+            let projectionChart = null;
+
+            async function loadProjection() {
+                try {
+                    const res = await api('/v1/admin/usage/projection');
+                    if (!res.ok) return;
+                    const data = await res.json();
+                    document.getElementById('projBaseline').textContent =
+                        'Baseline: ' + data.baseline_model + ' (modelo mais caro usado)';
+                    document.getElementById('projReal').textContent = fmtUsd(data.totals.real_cost_usd);
+                    document.getElementById('projProjected').textContent = fmtUsd(data.totals.projected_cost_usd);
+                    document.getElementById('projSaved').textContent =
+                        fmtUsd(data.totals.saved_usd) + ' (' + data.totals.savings_percent + '%)';
+                    document.getElementById('projCacheRate').textContent = data.totals.cache_hit_rate + '%';
+                    renderProjectionChart(data.daily);
+                } catch (e) { /* silencioso — gráfico é bônus */ }
+            }
+
+            function renderProjectionChart(daily) {
+                const canvas = document.getElementById('projectionChart');
+                if (!canvas) return;
+                const ctx = canvas.getContext('2d');
+                const dpr = window.devicePixelRatio || 1;
+                const rect = canvas.parentElement.getBoundingClientRect();
+                canvas.width = rect.width * dpr;
+                canvas.height = 280 * dpr;
+                canvas.style.width = rect.width + 'px';
+                canvas.style.height = '280px';
+                ctx.scale(dpr, dpr);
+
+                const w = rect.width;
+                const h = 280;
+                const pad = { top: 20, right: 20, bottom: 40, left: 60 };
+                const pw = w - pad.left - pad.right;
+                const ph = h - pad.top - pad.bottom;
+
+                ctx.clearRect(0, 0, w, h);
+
+                // Encontra o valor máximo para escala
+                let maxVal = 0;
+                for (const d of daily) {
+                    maxVal = Math.max(maxVal, d.real_cost, d.projected_cost);
+                }
+                if (maxVal === 0) maxVal = 1;
+
+                // Eixos
+                ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(pad.left, pad.top);
+                ctx.lineTo(pad.left, h - pad.bottom);
+                ctx.lineTo(w - pad.right, h - pad.bottom);
+                ctx.stroke();
+
+                // Grid horizontal
+                const gridLines = 5;
+                for (let i = 0; i <= gridLines; i++) {
+                    const y = pad.top + (ph / gridLines) * i;
+                    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+                    ctx.beginPath();
+                    ctx.moveTo(pad.left, y);
+                    ctx.lineTo(w - pad.right, y);
+                    ctx.stroke();
+                    // Label
+                    const val = maxVal - (maxVal / gridLines) * i;
+                    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+                    ctx.font = '10px monospace';
+                    ctx.textAlign = 'right';
+                    ctx.fillText('$' + val.toFixed(4), pad.left - 8, y + 4);
+                }
+
+                // Barras e linha
+                const barWidth = Math.max(4, Math.min(16, pw / daily.length * 0.6));
+                const gap = pw / daily.length;
+
+                // Barras: custo real
+                for (let i = 0; i < daily.length; i++) {
+                    const d = daily[i];
+                    const x = pad.left + gap * i + (gap - barWidth) / 2;
+                    const barH = (d.real_cost / maxVal) * ph;
+                    const y = h - pad.bottom - barH;
+
+                    // Gradiente da barra
+                    const grad = ctx.createLinearGradient(x, y, x, h - pad.bottom);
+                    grad.addColorStop(0, '#6366f1');
+                    grad.addColorStop(1, 'rgba(99,102,241,0.3)');
+                    ctx.fillStyle = grad;
+                    ctx.fillRect(x, y, barWidth, barH);
+
+                    // Label do dia (a cada 5 dias)
+                    if (i % 5 === 0 || i === daily.length - 1) {
+                        const date = new Date(d.date + 'T12:00:00');
+                        ctx.fillStyle = 'rgba(255,255,255,0.5)';
+                        ctx.font = '9px monospace';
+                        ctx.textAlign = 'center';
+                        ctx.fillText(
+                            date.getDate() + '/' + (date.getMonth() + 1),
+                            pad.left + gap * i + gap / 2,
+                            h - pad.bottom + 16
+                        );
+                    }
+                }
+
+                // Linha: custo projetado
+                ctx.strokeStyle = '#f59e0b';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([4, 3]);
+                ctx.beginPath();
+                let firstPoint = true;
+                for (let i = 0; i < daily.length; i++) {
+                    const d = daily[i];
+                    const x = pad.left + gap * i + gap / 2;
+                    const y = h - pad.bottom - (d.projected_cost / maxVal) * ph;
+                    if (firstPoint) { ctx.moveTo(x, y); firstPoint = false; }
+                    else { ctx.lineTo(x, y); }
+                }
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // Legenda
+                const lx = w - pad.right - 280;
+                const ly = pad.top + 4;
+                // Barra (real)
+                ctx.fillStyle = '#6366f1';
+                ctx.fillRect(lx, ly, 12, 12);
+                ctx.fillStyle = '#fff';
+                ctx.font = '11px sans-serif';
+                ctx.textAlign = 'left';
+                ctx.fillText('Custo real (roteado + cache)', lx + 18, ly + 10);
+                // Linha (projetado)
+                ctx.strokeStyle = '#f59e0b';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([4, 3]);
+                ctx.beginPath();
+                ctx.moveTo(lx, ly + 28);
+                ctx.lineTo(lx + 30, ly + 28);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.fillStyle = '#fff';
+                ctx.fillText('Custo projetado (modelo único)', lx + 38, ly + 32);
+            }
+
+            // Redesenha o gráfico ao redimensionar
+            let resizeTimeout;
+            window.addEventListener('resize', () => {
+                clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(() => {
+                    if (projectionChart) renderProjectionChart(projectionChart);
+                }, 200);
+            });
+
             // ----- Cobrança -----
             async function loadBilling() {
                 const res = await api('/v1/admin/billing');
@@ -713,7 +881,7 @@
                     ['painel','uso','logs','playground','cobranca'].forEach(t =>
                         document.getElementById('tab-' + t).style.display = t === tab ? '' : 'none');
                     try {
-                        if (tab === 'uso') { if (!pricingCatalog.length) await loadPricing(); await loadUsage(); }
+                        if (tab === 'uso') { if (!pricingCatalog.length) await loadPricing(); await loadUsage(); await loadProjection(); }
                         else if (tab === 'cobranca') { await loadBilling(); }
                         else if (tab === 'logs') { await loadLogs(); }
                     } catch (err) { showMsg(err.message, 'error'); }

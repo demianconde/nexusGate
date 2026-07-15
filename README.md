@@ -127,3 +127,14 @@ tests/                 # pytest
 ## Segurança
 - Nunca comitar `.env` nem segredos. Chaves BYOK são criptografadas at-rest (envelope encryption, Fase 2).
 - Logs não registram prompts, segredos ou PII.
+
+## Créditos
+
+Desenvolvido por [**@demianconde**](https://github.com/demianconde).
+
+Ferramentas de IA usadas na construção do projeto:
+- **Claude** (Anthropic) — desenvolvimento assistido e revisão de código
+- **DeepSeek** — apoio no desenvolvimento
+
+> O painel *Contributors* do GitHub lista apenas contas vinculadas ao histórico de commits;
+> esta seção reconhece as ferramentas de IA utilizadas no desenvolvimento.

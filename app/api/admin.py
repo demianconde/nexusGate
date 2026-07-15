@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import random
 import uuid
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import func, select
@@ -10,7 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.api_key import generate_api_key
 from app.auth.supabase import get_current_user
-from app.db.models import AegisApiKey, Tenant, User
+from app.config import get_settings
+from app.db.models import AegisApiKey, Tenant, UsageLog, User
 from app.db.session import get_db
 
 from .schemas import (

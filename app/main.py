@@ -25,6 +25,7 @@ from app.api import (
     playground,
     provider_keys,
     proxy,
+    seed,
     usage,
 )
 from app.config import get_settings
@@ -93,6 +94,9 @@ def create_app() -> FastAPI:
         return response
 
     app.include_router(health.router)
+    # Seed dashboard (so em dev mode)
+    if settings.dev_bypass_enabled:
+        app.include_router(seed.router)
     app.include_router(admin.router)
     app.include_router(provider_keys.router)
     app.include_router(usage.router)

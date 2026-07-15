@@ -64,7 +64,9 @@ async def seed_dashboard(
             continue
 
         hour = random.randint(11, 23)
-        req_ts = req_date.replace(hour=hour, minute=random.randint(0, 59), second=random.randint(0, 59))
+        req_ts = req_date.replace(
+            hour=hour, minute=random.randint(0, 59), second=random.randint(0, 59)
+        )
 
         r = random.random()
         if r < 0.6:

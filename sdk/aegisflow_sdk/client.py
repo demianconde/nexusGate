@@ -14,7 +14,7 @@ from __future__ import annotations
 import json
 import time
 from collections.abc import Iterator
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 import httpx
@@ -22,7 +22,6 @@ import httpx
 from .types import (
     ChatCompletion,
     ChatCompletionChunk,
-    ChatMessage,
     parse_chat_completion,
     parse_chunk,
 )

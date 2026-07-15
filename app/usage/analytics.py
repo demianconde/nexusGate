@@ -216,7 +216,10 @@ async def monthly_projection(db: AsyncSession, tenant_id: uuid.UUID) -> dict:
             "projected_cost_usd": round(total_projected, 6),
             "saved_usd": round(total_projected - total_real, 6),
             "savings_percent": round(
-                ((total_projected - total_real) / total_projected * 100) if total_projected > 0 else 0, 1
+                ((total_projected - total_real) / total_projected * 100)
+                if total_projected > 0
+                else 0,
+                1,
             ),
             "requests": total_requests,
             "cache_hits": total_cache_hits,

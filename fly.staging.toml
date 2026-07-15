@@ -1,16 +1,16 @@
 # fly.staging.toml — AegisFlow Staging (homologação)
-# Modo dev com SQLite — não depende de Postgres/Redis externos.
+# Modo dev com Supabase Postgres — projeto SEPARADO de produção (ref zdxswdoxnusiujddtpsn),
+# para isolar dados reais do bypass de login. Nunca apontar para a base de produção.
 app = "aegisflow-staging"
 primary_region = "gru"
 
 [build]
 
-# No staging, migrations rodam com SQLite local.
 [deploy]
   release_command = "alembic upgrade head"
 
 # Segredos via `fly secrets set -a aegisflow-staging`.
-# Não sensíveis: modo dev para testar sem depender de infra externa.
+# DATABASE_URL aponta para o projeto Supabase de STAGING (session pooler :5432), não o de produção.
 [env]
   AEGIS_ENV = "development"
   AEGIS_DEV_MODE = "true"

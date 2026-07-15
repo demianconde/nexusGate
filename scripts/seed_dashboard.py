@@ -11,11 +11,9 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import json
 import os
 import random
 import sys
-from datetime import UTC, datetime, timedelta
 
 import httpx
 
@@ -172,7 +170,7 @@ async def seed_historical(
                 chosen = all_prompts[-1][0]
 
             model, text = chosen
-            result = await send_request(client, api_key, model, text)
+            await send_request(client, api_key, model, text)
             total += 1
             
             if total % 10 == 0:
@@ -195,7 +193,7 @@ async def seed_duplicates(client: httpx.AsyncClient, api_key: str, count: int = 
             print(f"  Cache HIT #{i+1}")
         await asyncio.sleep(0.05)
     
-    print(f"  Concluido.")
+    print("  Concluido.")
 
 
 async def main():
@@ -205,9 +203,9 @@ async def main():
     parser.add_argument("--duplicates", type=int, default=30, help="Requisicoes duplicadas para cache (default: 30)")
     args = parser.parse_args()
 
-    print(f"AegisFlow Dashboard Seed")
+    print("AegisFlow Dashboard Seed")
     print(f"Base URL: {BASE}")
-    print(f"Modo: dev (bypass)")
+    print("Modo: dev (bypass)")
     
     async with httpx.AsyncClient(timeout=120.0) as client:
         # Verifica se o staging esta no ar
@@ -229,9 +227,9 @@ async def main():
         # Gera cache hits
         await seed_duplicates(client, api_key, args.duplicates)
 
-    print(f"\n✅ Dashboard populado!")
+    print("\n✅ Dashboard populado!")
     print(f"   Acesse: {BASE}/dashboard")
-    print(f"   Login: clique em 'Entrar sem login (dev)'")
+    print("   Login: clique em 'Entrar sem login (dev)'")
 
 
 if __name__ == "__main__":

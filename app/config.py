@@ -53,8 +53,18 @@ class Settings(BaseSettings):
             v = "postgresql+asyncpg://" + v[len("postgresql://") :]
 
         parts = urlsplit(v)
-        if not parts.query:
-            return v
+        # Corrige porta vazia (Railway/Fly às vezes fornecem DATABASE_URL sem :port,
+        # ex.: postgres://user:pass@host/dbname — o urlsplit retorna port="").
+        netloc = parts.hostname or ""
+        if parts.port:
+            netloc += f":{parts.port}"
+        elif parts.username:
+            # Reconstrói netloc sem porta (usa a default 5432 do asyncpg)
+            netloc = f"{parts.username}"
+            if parts.password:
+                netloc += f":{parts.password}"
+            netloc += f"@{parts.hostname}"
+
         kept: list[tuple[str, str]] = []
         for key, val in parse_qsl(parts.query, keep_blank_values=True):
             if key == "channel_binding":
@@ -64,7 +74,7 @@ class Settings(BaseSettings):
                     kept.append(("ssl", val.lower()))
                 continue
             kept.append((key, val))
-        return urlunsplit(parts._replace(query=urlencode(kept)))
+        return urlunsplit(parts._replace(netloc=netloc, query=urlencode(kept)))
 
     # Supabase (Fase 1)
     supabase_url: str | None = Field(default=None, alias="SUPABASE_URL")

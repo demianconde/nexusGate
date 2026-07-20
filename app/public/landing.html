@@ -71,7 +71,7 @@
                 <a href="/documentacao">Documentação</a>
             </div>
             <div class="nav-cta">
-                <a href="#interesse" class="btn btn-primary">Tenho interesse</a>
+                <a href="/login" class="btn btn-primary">Começar grátis</a>
             </div>
         </div>
     </nav>
@@ -84,9 +84,10 @@
             <p class="sub">O gateway de LLM feito para empresas brasileiras. Ele roteia cada requisição para o <strong>modelo mais barato que resolve</strong>, reaproveita respostas com <strong>cache semântico</strong> e usa <strong>a sua própria chave (BYOK)</strong> — cifrada em repouso. E o melhor: <strong>não cobramos pedágio sobre seus tokens.</strong></p>
             <p class="tags">LGPD · dados no Brasil · Pix e boleto · suporte em português</p>
             <div class="hero-actions">
-                <a href="#interesse" class="btn btn-primary btn-lg">✋ Tenho interesse</a>
+                <a href="/login" class="btn btn-primary btn-lg">🚀 Começar grátis</a>
                 <a href="#simulador" class="btn btn-ghost btn-lg glass">📊 Calcular Economia</a>
             </div>
+            <p class="tags" style="margin-top:0.75rem">Grátis para sempre no plano Hobby · sem cartão de crédito</p>
 
             <!-- Mockup -->
             <div class="mockup glass">
@@ -251,7 +252,7 @@ resp = client.chat.completions.create(
                     <p class="desc">Para testar projetos e provas de conceito.</p>
                     <div class="price"><span class="amt">R$ 0</span><span class="per">/mês</span></div>
                     <ul><li>60 requisições/min (pico)</li><li>Roteamento por custo</li><li>Cache semântico</li><li>Cofre BYOK cifrado</li></ul>
-                    <a href="#interesse" class="btn btn-outline">Tenho interesse</a>
+                    <a href="/login" class="btn btn-primary">Começar grátis</a>
                 </div>
                 <div class="plan featured glass">
                     <span class="tag">Mais Popular</span>
@@ -259,7 +260,7 @@ resp = client.chat.completions.create(
                     <p class="desc">Para engenheiros solo e pequenas equipes.</p>
                     <div class="price"><span class="amt">R$ 249</span><span class="per">/mês</span></div>
                     <ul><li>300 requisições/min (pico)</li><li>Roteamento avançado + fallback</li><li>Relatório de economia exportável (CSV)</li><li>Cache semântico com TTL configurável</li><li>Qualquer LLM, na nuvem ou local (ex.: GPT, Claude, Gemini, Llama, Ollama…)</li></ul>
-                    <a href="#interesse" class="btn btn-primary">Tenho interesse</a>
+                    <a href="/login" class="btn btn-primary">Assinar o Pro</a>
                 </div>
                 <div class="plan glass">
                     <h3>Teams</h3>
@@ -267,7 +268,7 @@ resp = client.chat.completions.create(
                     <div class="price"><span class="amt">R$ 999</span><span class="per">/mês</span></div>
                     <p class="seat-note">Inclui 5 usuários · + R$ 149 por usuário extra</p>
                     <ul><li>Tudo do plano Pro</li><li>1.200 requisições/min (pico)</li><li>5 usuários inclusos (escala por assento)</li><li>Chaves virtuais (orçamento e limite por chave)</li><li>Guardrails + redação de PII (LGPD)</li><li>Logs de requisições</li></ul>
-                    <a href="#interesse" class="btn btn-outline">Tenho interesse</a>
+                    <a href="/login" class="btn btn-outline">Assinar o Teams</a>
                 </div>
                 <div class="plan glass">
                     <h3>Enterprise</h3>
@@ -275,43 +276,22 @@ resp = client.chat.completions.create(
                     <div class="price"><span class="amt small">Sob consulta</span></div>
                     <p class="seat-note">Preço sob medida para o seu volume e time</p>
                     <ul><li>Tudo do plano Teams</li><li>Requisições/min sob medida</li><li>SSO/SAML e SLA</li><li>Opção on-premise / VPC dedicada</li><li>Suporte dedicado e revisão de segurança</li><li>NF-e e dados no Brasil garantidos</li></ul>
-                    <a href="#interesse" class="btn btn-outline">Fale conosco</a>
+                    <a href="mailto:contato@aegisflow.tech?subject=Enterprise" class="btn btn-outline">Fale conosco</a>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- Formulário de interesse -->
-    <section class="section cta" id="interesse">
-        <div class="container" style="max-width:46rem">
-            <div id="leadIntro">
-                <h2>Quer economizar na sua conta de IA?</h2>
-                <p>Estamos abrindo as primeiras vagas. Deixe seu contato e avisamos assim que liberarmos o acesso — sem compromisso.</p>
-                <form id="leadForm" class="sim-card glass" style="text-align:left;margin-top:1rem">
-                    <div class="msg" id="leadMsg"></div>
-                    <div class="field"><label for="lName">Nome*</label><input class="input" id="lName" required></div>
-                    <div class="field"><label for="lEmail">E-mail*</label><input class="input" id="lEmail" type="email" required></div>
-                    <div class="field"><label for="lCompany">Empresa</label><input class="input" id="lCompany"></div>
-                    <div class="field">
-                        <label for="lSpend">Gasto mensal atual com IA (aprox.)</label>
-                        <select class="input" id="lSpend">
-                            <option value="">Prefiro não dizer</option>
-                            <option>Até R$ 500</option>
-                            <option>R$ 500 – 5.000</option>
-                            <option>R$ 5.000 – 20.000</option>
-                            <option>Acima de R$ 20.000</option>
-                        </select>
-                    </div>
-                    <div class="field"><label for="lMsg">Mensagem (opcional)</label><textarea class="input" id="lMsg" rows="3" placeholder="Conte seu caso de uso..."></textarea></div>
-                    <button class="btn btn-primary btn-block" type="submit" id="leadBtn">Quero participar</button>
-                </form>
+    <!-- CTA final: comece grátis -->
+    <section class="section cta" id="comecar">
+        <div class="container" style="max-width:46rem; text-align:center">
+            <h2>Comece grátis em 2 minutos</h2>
+            <p>Crie sua conta, cadastre a sua chave BYOK e faça a primeira chamada agora mesmo. O plano <strong>Hobby é grátis para sempre</strong> — sem cartão de crédito.</p>
+            <div class="hero-actions" style="justify-content:center; margin-top:1.5rem">
+                <a href="/login" class="btn btn-primary btn-lg">🚀 Criar conta grátis</a>
+                <a href="/documentacao" class="btn btn-ghost btn-lg glass">📖 Ver a documentação</a>
             </div>
-
-            <div id="leadSuccess" class="sim-card glass" style="display:none; text-align:center; padding:2.5rem 2rem">
-                <div style="font-size:3rem; line-height:1; margin-bottom:0.5rem">✅</div>
-                <h2 style="border:0; margin:0 0 0.5rem">Recebemos seu interesse!</h2>
-                <p style="margin:0 auto; max-width:32rem">Obrigado! Assim que liberarmos o acesso, avisamos no seu e-mail. Enquanto isso, fique de olho na caixa de entrada. 🚀</p>
-            </div>
+            <p class="tags" style="margin-top:1rem">LGPD · dados no Brasil · zero markup sobre tokens</p>
         </div>
     </section>
 
@@ -325,7 +305,7 @@ resp = client.chat.completions.create(
                     <a href="/privacidade">Privacidade &amp; LGPD</a>
                     <a href="/artigos">Artigos</a>
                     <a href="/documentacao">Documentação</a>
-                    <a href="/#interesse">Contato</a>
+                    <a href="mailto:contato@aegisflow.tech">Contato</a>
                 </div>
             </div>
             <div class="copy">© 2026 AegisFlow. Chaves BYOK cifradas em repouso — nunca armazenadas em texto plano. Zero markup sobre tokens.</div>
@@ -379,45 +359,6 @@ resp = client.chat.completions.create(
 
             spendSlider.addEventListener('input', update);
             update();
-
-            // Formulário de interesse (captação de leads)
-            const leadForm = document.getElementById('leadForm');
-            if (leadForm) {
-                const leadMsg = document.getElementById('leadMsg');
-                const leadBtn = document.getElementById('leadBtn');
-                leadForm.addEventListener('submit', async (e) => {
-                    e.preventDefault();
-                    leadBtn.disabled = true;
-                    leadMsg.className = 'msg';
-                    try {
-                        const payload = {
-                            name: document.getElementById('lName').value.trim(),
-                            email: document.getElementById('lEmail').value.trim(),
-                            company: document.getElementById('lCompany').value.trim() || null,
-                            monthly_spend: document.getElementById('lSpend').value || null,
-                            message: document.getElementById('lMsg').value.trim() || null,
-                        };
-                        const res = await fetch('/v1/leads', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(payload),
-                        });
-                        const d = await res.json().catch(() => ({}));
-                        if (!res.ok) throw new Error(d.detail || 'Falha ao enviar.');
-                        leadForm.reset();
-                        // fecha o formulário e mostra o estado de sucesso
-                        document.getElementById('leadIntro').style.display = 'none';
-                        const ok = document.getElementById('leadSuccess');
-                        ok.style.display = '';
-                        ok.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    } catch (err) {
-                        leadMsg.className = 'msg show error';
-                        leadMsg.textContent = err.message;
-                    } finally {
-                        leadBtn.disabled = false;
-                    }
-                });
-            }
         });
     </script>
 </body>

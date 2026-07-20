@@ -124,14 +124,24 @@ Certificados já emitidos (`fly certs`). Registros DNS na GoDaddy:
 
 TLS/HTTPS é emitido automaticamente pelo Fly após a propagação. Verificar: `fly certs check aegisflow.tech`.
 
-## 8. Configuração externa necessária (checklist de publicação)
+## 8. Configuração externa necessária (checklist de publicação do free)
 
-- [ ] **Supabase Auth:** desligar "Confirm email" (Authentication → Providers → Email) **ou** configurar SMTP próprio — senão o cadastro não completa. *(bloqueador do free)*
-- [ ] **Supabase Auth → URL Configuration:** Site URL `https://aegisflow.tech` + Redirect `https://aegisflow.tech/**` (magic link / Google).
+O cadastro grátis self-service já está no código (login Supabase → tenant plano `free`,
+sem cartão) com anti-abuso (blocklist de e-mail descartável + limite de contas por IP/dia).
+Para liberar ao público, falta **configuração externa** (não é código):
+
+- [ ] **Supabase Auth → e-mail verificado (escolha do produto: B):** manter "Confirm email"
+      LIGADO **e configurar SMTP próprio** (Authentication → Providers → Email) — senão o
+      e-mail de confirmação não é enviado e o cadastro não completa. *(bloqueador do free)*
+- [ ] **Supabase Auth → URL Configuration:** Site URL `https://aegisflow.tech` + Redirect
+      `https://aegisflow.tech/**` (confirmação de e-mail / magic link / Google).
 - [ ] **Fly billing:** cartão cadastrado (evita suspensão do app / habilita add-ons).
 - [ ] **GoDaddy DNS:** registros da seção 7 (feito).
 - [ ] **Segurança:** `AEGIS_MASTER_KEY` guardada com segurança; rotacionar a senha do banco se exposta.
 - [ ] **Termos/Privacidade:** preencher razão social/CNPJ (placeholders em `termos.html`/`privacidade.html`).
+- [ ] **Retenção de custo (recomendado):** agendar `scripts/prune_usage_logs.py` (cron diário)
+      para limitar o crescimento de `usage_logs` — principal custo variável do free em escala.
+      Opcional: ajustar `AEGIS_SIGNUP_IP_DAILY_LIMIT` / `AEGIS_DISPOSABLE_EMAIL_DOMAINS`.
 
 ## 9. URLs úteis
 

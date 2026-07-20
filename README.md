@@ -120,9 +120,9 @@ tests/                 # pytest
 - **F4 Cache semântico real** ✅ embeddings locais (Ollama) + store vetorial por tenant; serve prompts similares sem chamar o provedor (`x-aegis-cache: hit`) e contabiliza a economia
 - **F5 Billing** ✅ planos em BRL (quotas mensais + rpm por plano), aba **Plano & Cobrança**, checkout Stripe com **Pix/boleto/cartão** (opcional, atrás de chave) + modo dev
 - **F6 Hardening** ✅ redação de PII (LGPD) + guardrail para provedores hospedados, `/metrics` (Prometheus), retries em erros transitórios
-- **Captação de leads + console do dono** ✅ landing com **formulário de interesse** (pré-lançamento, sem login); `POST /v1/leads` público; **console do dono** oculto em `/gestaoaegis` (login Google/Supabase, gate por `AEGIS_OWNER_EMAILS`) com MRR, assinaturas e gestão de leads
+- **Cadastro grátis self-service + console do dono** ✅ landing com CTA **"Começar grátis"** → `/login` (plano Hobby, sem cartão); anti-abuso do free: **blocklist de e-mail descartável** + **limite de contas por IP/dia** (`AEGIS_BLOCK_DISPOSABLE_EMAIL`, `AEGIS_SIGNUP_IP_DAILY_LIMIT`); **console do dono** oculto em `/gestaoaegis` (login Google/Supabase, gate por `AEGIS_OWNER_EMAILS`) com MRR, assinaturas e leads. `POST /v1/leads` mantido para uso interno.
 - **Recursos avançados** ✅ observabilidade (logs de requisição + tracing, opt-in de prévias com redação PII); `/v1/models` e `/v1/embeddings` (OpenAI-compat, BYOK); **chaves virtuais** (orçamento mensal, rpm e allowlist de modelos por chave); **Playground** no painel; **fallback** configurável (`fallback: ["provider:model", ...]`)
-- **Deploy / GA** 🚧 ver [DEPLOY.md](DEPLOY.md) — cache vetorial em Redis, cloud KMS, testes de carga, Pix em produção
+- **Deploy / GA** 🚧 ver [DEPLOY.md](DEPLOY.md) — retenção de `usage_logs` (`scripts/prune_usage_logs.py`), cloud KMS, testes de carga, Pix em produção
 
 ## Segurança
 - Nunca comitar `.env` nem segredos. Chaves BYOK são criptografadas at-rest (envelope encryption, Fase 2).

@@ -7,13 +7,15 @@ provisionamento (get-or-create) do tenant e do usuário no nosso banco.
 from __future__ import annotations
 
 import httpx
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.db.models import Tenant, User
 from app.db.session import get_db
+from app.ratelimit import enforce_signup_ip
+from app.security.email_policy import is_disposable_email
 
 from .tokens import extract_bearer
 
@@ -52,7 +54,29 @@ async def verify_supabase_token(token: str) -> dict:
     return resp.json()
 
 
-async def _get_or_create_user(db: AsyncSession, supabase_user: dict) -> User:
+async def _assert_signup_allowed(email: str, client_ip: str | None) -> None:
+    """Travas anti-abuso aplicadas APENAS na criação de uma conta nova (Sybil).
+
+    - Bloqueia domínios de e-mail descartável (determinístico).
+    - Limita o nº de contas novas por IP/dia (best-effort via Redis).
+    Contas já existentes nunca passam por aqui — usuários legítimos não são afetados.
+    """
+    settings = get_settings()
+    if settings.block_disposable_email and is_disposable_email(
+        email, settings.disposable_email_extra_set
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cadastro com e-mail temporário/descartável não é permitido. "
+            "Use um e-mail permanente.",
+        )
+    if client_ip:
+        await enforce_signup_ip(client_ip, settings.signup_ip_daily_limit)
+
+
+async def _get_or_create_user(
+    db: AsyncSession, supabase_user: dict, client_ip: str | None = None
+) -> User:
     """Vincula o usuário Supabase a um User/Tenant local, criando na primeira vez."""
     supabase_user_id = supabase_user.get("id")
     if not supabase_user_id:
@@ -64,6 +88,7 @@ async def _get_or_create_user(db: AsyncSession, supabase_user: dict) -> User:
         return user
 
     email = supabase_user.get("email") or "novo-usuario"
+    await _assert_signup_allowed(email, client_ip)
     tenant_name = email.split("@")[0]
     tenant = Tenant(name=tenant_name)
     db.add(tenant)
@@ -77,6 +102,7 @@ async def _get_or_create_user(db: AsyncSession, supabase_user: dict) -> User:
 
 
 async def get_current_user(
+    request: Request,
     authorization: str | None = Header(default=None),
     db: AsyncSession = Depends(get_db),
 ) -> User:
@@ -92,8 +118,9 @@ async def get_current_user(
     if get_settings().dev_bypass_enabled and token == DEV_ACCESS_TOKEN:
         return await _get_or_create_user(db, _DEV_SUPABASE_USER)
 
+    client_ip = request.client.host if request.client else None
     supabase_user = await verify_supabase_token(token)
-    return await _get_or_create_user(db, supabase_user)
+    return await _get_or_create_user(db, supabase_user, client_ip=client_ip)
 
 
 async def require_owner(authorization: str | None = Header(default=None)) -> dict:

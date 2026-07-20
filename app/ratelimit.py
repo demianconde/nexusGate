@@ -54,6 +54,33 @@ async def enforce_minute(
         )
 
 
+async def enforce_signup_ip(ip: str, limit: int) -> None:
+    """Teto de contas novas criadas a partir do mesmo IP por dia (anti-Sybil).
+
+    Best-effort: se o Redis estiver indisponível, NÃO bloqueia o cadastro (não faz
+    sentido barrar usuários legítimos por causa do rate limiter). ``limit <= 0``
+    desativa a trava.
+    """
+    if limit <= 0:
+        return
+    now = int(time.time())
+    key = f"signup:{ip}:{time.strftime('%Y%m%d', time.gmtime(now))}"
+    try:
+        redis = get_redis()
+        used = await redis.incr(key)
+        if used == 1:
+            await redis.expire(key, 24 * 3600)
+    except RedisError as exc:
+        _on_redis_error(exc, fail_open=True)
+        return
+    if used > limit:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Muitas contas criadas a partir deste endereço. Tente novamente mais tarde.",
+            headers={"Retry-After": str(24 * 3600)},
+        )
+
+
 async def enforce_monthly_quota(tenant_id: str, quota: int, plan_label: str) -> None:
     """Quota mensal de requisições do tenant."""
     now = int(time.time())

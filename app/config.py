@@ -90,6 +90,14 @@ class Settings(BaseSettings):
     allow_private_endpoints: bool = Field(default=False, alias="AEGIS_ALLOW_PRIVATE_ENDPOINTS")
     # Rate limit / quota: se true, bloqueia quando o Redis está indisponível (fail-closed).
     ratelimit_fail_closed: bool = Field(default=False, alias="AEGIS_RATELIMIT_FAIL_CLOSED")
+
+    # Anti-abuso do cadastro grátis (Sybil / multi-conta).
+    # Bloqueia domínios de e-mail descartável no provisionamento do tenant.
+    block_disposable_email: bool = Field(default=True, alias="AEGIS_BLOCK_DISPOSABLE_EMAIL")
+    # Domínios descartáveis extras (além da lista built-in), separados por vírgula.
+    disposable_email_domains: str = Field(default="", alias="AEGIS_DISPOSABLE_EMAIL_DOMAINS")
+    # Nº máximo de contas novas criadas a partir do mesmo IP por dia (0 = sem limite).
+    signup_ip_daily_limit: int = Field(default=5, alias="AEGIS_SIGNUP_IP_DAILY_LIMIT")
     # CORS: origens permitidas em produção (separadas por vírgula).
     cors_origins: str = Field(default="", alias="AEGIS_CORS_ORIGINS")
     # Token opcional para proteger /metrics.
@@ -142,6 +150,11 @@ class Settings(BaseSettings):
     @property
     def owner_email_set(self) -> set[str]:
         return {e.strip().lower() for e in self.owner_emails.split(",") if e.strip()}
+
+    @property
+    def disposable_email_extra_set(self) -> set[str]:
+        """Domínios descartáveis extras configurados via ambiente (minúsculas)."""
+        return {d.strip().lower() for d in self.disposable_email_domains.split(",") if d.strip()}
 
     @property
     def ratelimit_fail_closed_effective(self) -> bool:

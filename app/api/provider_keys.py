@@ -159,11 +159,21 @@ async def update_provider_key(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ProviderKeyInfo:
-    """Atualiza o `default_model` de uma credencial (define/troca o modelo padrão)."""
+    """Atualiza parcialmente uma credencial: `default_model` e/ou `api_key` (recifra).
+
+    Só altera os campos explicitamente enviados (não zera o que não veio no corpo).
+    """
     record = await db.get(ProviderKey, key_id)
     if record is None or record.tenant_id != user.tenant_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chave não encontrada")
-    record.default_model = (body.default_model or "").strip() or None
+    fields = body.model_fields_set
+    if "default_model" in fields:
+        record.default_model = (body.default_model or "").strip() or None
+    if "api_key" in fields:
+        enc = encrypt_secret(body.api_key or "")  # recifra; chave vazia é válida (locais)
+        record.ciphertext = enc.ciphertext
+        record.nonce = enc.nonce
+        record.dek_wrapped = enc.dek_wrapped
     await db.commit()
     await db.refresh(record)
     return _to_info(record)

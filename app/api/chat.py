@@ -172,6 +172,27 @@ def _delta_content(chunk: bytes) -> str:
         return ""
 
 
+def _provider_error_detail(exc: Exception | None) -> str:
+    """Mensagem de erro segura para o cliente, repassando o status real do provedor.
+
+    Não vaza segredos: a mensagem vem do corpo de erro do provedor (que reclama de
+    auth/modelo/crédito, nunca ecoa a chave) e é truncada.
+    """
+    if isinstance(exc, ProviderError):
+        msg = " ".join((exc.message or "").split())[:200]
+        hint = {
+            401: " Verifique a chave de API da credencial do provedor.",
+            403: " Verifique a chave/permissões da credencial do provedor.",
+            402: " Provedor sem créditos ou limite de gasto atingido.",
+            404: " Modelo não encontrado no provedor.",
+            429: " Limite de requisições do provedor atingido.",
+        }.get(exc.status_code, "")
+        return f"O provedor retornou HTTP {exc.status_code}.{hint} Detalhe: {msg}"
+    if exc is not None:
+        return f"Falha de conexão com o provedor ({type(exc).__name__})."
+    return "Falha ao processar a requisição no provedor."
+
+
 def _preview(text: str) -> str | None:
     """Prévia redigida (LGPD) para observabilidade — só quando log_content está ligado."""
     if not get_settings().log_content or not text:
@@ -316,7 +337,7 @@ async def chat_completions(
                 except (ProviderError, httpx.HTTPError, ValueError) as exc:
                     if sent or idx == len(plan.attempts) - 1:
                         inc("aegis_errors_total")
-                        yield openai_error_chunk(f"{type(exc).__name__}: {str(exc)[:300]}")
+                        yield openai_error_chunk(_provider_error_detail(exc))
                         break
                     continue
             model_used = usage.model or used.model
@@ -384,9 +405,6 @@ async def chat_completions(
         cost_usd=0.0, latency_ms=now_ms() - started, status="error",
         prompt_preview=_preview(cache_text),
     )
-    detail = (
-        "Falha ao processar a requisição no provedor."
-        if settings.is_production
-        else f"Todos os provedores falharam. Último erro: {str(last_exc)[:300]}"
+    raise HTTPException(
+        status_code=status.HTTP_502_BAD_GATEWAY, detail=_provider_error_detail(last_exc)
     )
-    raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=detail)

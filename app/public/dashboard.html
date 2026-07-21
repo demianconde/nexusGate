@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Painel · AegisFlow</title>
-    <link rel="stylesheet" href="/static/styles.css?v=5">
+    <link rel="stylesheet" href="/static/styles.css?v=6">
     <script src="/static/vendor/supabase.js"></script>
 </head>
 <body>
@@ -74,6 +74,12 @@
                     <div class="field">
                         <label for="providerSelect">Provedor</label>
                         <select class="input" id="providerSelect"></select>
+                        <div class="notice-warn" id="localWarning" hidden>
+                            ⚠ <strong>Endpoint local neste ambiente em nuvem.</strong> O servidor do AegisFlow
+                            não alcança o <code>localhost</code> da sua máquina — modelos locais (Ollama, LM Studio,
+                            vLLM) só funcionam com <strong>self-host</strong> (o AegisFlow rodando na sua rede).
+                            Para usar aqui, escolha um provedor em nuvem (OpenRouter, OpenAI, etc.).
+                        </div>
                     </div>
                     <div class="field">
                         <label for="providerLabel">Nome da API</label>
@@ -476,11 +482,17 @@
                 syncProviderPlaceholder();
             }
 
+            // "Nuvem" = dashboard servido de um host que não é a máquina local.
+            const isCloudHost = !['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
+
             function syncProviderPlaceholder() {
                 const opt = providerSelect.selectedOptions[0];
                 if (!opt) return;
                 const base = opt.getAttribute('data-base');
                 providerBaseUrl.placeholder = base ? ('Padrão: ' + base) : 'Base URL (obrigatória para custom)';
+                // Aviso: provedor local só funciona em self-host; na nuvem o localhost é inalcançável.
+                const isLocal = opt.getAttribute('data-local') === 'true';
+                document.getElementById('localWarning').hidden = !(isLocal && isCloudHost);
             }
             providerSelect.addEventListener('change', syncProviderPlaceholder);
 

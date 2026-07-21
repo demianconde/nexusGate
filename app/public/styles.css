@@ -311,6 +311,15 @@ input[type=range]::-moz-range-thumb { height: 24px; width: 24px; border: none; b
 .modal-list .combo-item:last-child { border-bottom: 0; }
 .modal-list .combo-item:hover { background: rgba(20, 184, 166, 0.16); }
 .modal-empty { padding: 0.8rem 0.9rem; color: var(--muted); font-size: 0.82rem; }
+
+/* Aviso inline (ex.: provedor local em ambiente de nuvem) */
+.notice-warn {
+  margin-top: 0.5rem; padding: 0.7rem 0.9rem; border-radius: 10px; font-size: 0.85rem;
+  line-height: 1.45; color: #fde68a;
+  background: rgba(245, 158, 11, 0.10); border: 1px solid rgba(245, 158, 11, 0.35);
+}
+.notice-warn[hidden] { display: none; }
+.notice-warn code { background: rgba(255, 255, 255, 0.08); padding: 0.05rem 0.3rem; border-radius: 4px; }
 .btn-block { width: 100%; }
 .auth-alt { text-align: center; margin-top: 1.25rem; font-size: 0.85rem; color: var(--muted); }
 .auth-alt a, .link-btn { color: var(--brand-400); cursor: pointer; background: none; border: none; font-size: inherit; }

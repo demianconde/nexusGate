@@ -8,15 +8,21 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.openai_compat import fetch_models
 from app.auth.supabase import get_current_user
 from app.config import get_settings
-from app.crypto import encrypt_secret, is_configured
+from app.crypto import decrypt_secret, encrypt_secret, is_configured
 from app.db.models import ProviderKey, User
 from app.db.session import get_db
 from app.providers.registry import KNOWN_PROVIDERS, is_local_url, resolve_endpoint
 from app.security.net import validate_endpoint_async
 
-from .schemas import ProviderKeyCreate, ProviderKeyInfo
+from .schemas import (
+    ProviderKeyCreate,
+    ProviderKeyInfo,
+    ProviderKeyUpdate,
+    ProviderModelsPreview,
+)
 
 router = APIRouter(prefix="/v1/admin", tags=["admin"])
 
@@ -105,6 +111,59 @@ async def create_provider_key(
         dek_wrapped=enc.dek_wrapped,
     )
     db.add(record)
+    await db.commit()
+    await db.refresh(record)
+    return _to_info(record)
+
+
+@router.post("/provider-keys/models-preview")
+async def preview_provider_models(
+    body: ProviderModelsPreview,
+    _user: User = Depends(get_current_user),
+) -> dict:
+    """Lista os modelos de um provedor a partir dos dados do formulário (antes de salvar).
+
+    Usado pelo painel para sugerir o `default_model` numa lista. Nunca grava nada.
+    """
+    try:
+        fmt, base_url = resolve_endpoint(body.provider, body.format, body.base_url)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    models = await fetch_models(
+        fmt, base_url, body.api_key or "", get_settings().allow_private_endpoints
+    )
+    return {"models": models, "count": len(models)}
+
+
+@router.get("/provider-keys/{key_id}/models")
+async def list_provider_key_models(
+    key_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Lista os modelos de uma credencial já salva (usa a chave cifrada do registro)."""
+    record = await db.get(ProviderKey, key_id)
+    if record is None or record.tenant_id != user.tenant_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chave não encontrada")
+    api_key = decrypt_secret(record.ciphertext, record.nonce, record.dek_wrapped)
+    models = await fetch_models(
+        record.format, record.base_url, api_key, get_settings().allow_private_endpoints
+    )
+    return {"models": models, "count": len(models)}
+
+
+@router.patch("/provider-keys/{key_id}", response_model=ProviderKeyInfo)
+async def update_provider_key(
+    key_id: uuid.UUID,
+    body: ProviderKeyUpdate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> ProviderKeyInfo:
+    """Atualiza o `default_model` de uma credencial (define/troca o modelo padrão)."""
+    record = await db.get(ProviderKey, key_id)
+    if record is None or record.tenant_id != user.tenant_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chave não encontrada")
+    record.default_model = (body.default_model or "").strip() or None
     await db.commit()
     await db.refresh(record)
     return _to_info(record)

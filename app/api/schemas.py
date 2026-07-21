@@ -47,6 +47,19 @@ class ProviderKeyCreate(BaseModel):
     default_model: str | None = None  # modelo padrão (útil p/ locais)
 
 
+class ProviderKeyUpdate(BaseModel):
+    default_model: str | None = None  # define/troca o modelo padrão da credencial
+
+
+class ProviderModelsPreview(BaseModel):
+    """Lista modelos de um provedor ANTES de salvar a credencial (para o painel sugerir)."""
+
+    provider: str
+    api_key: str | None = None
+    base_url: str | None = None
+    format: str | None = None
+
+
 class ProviderKeyInfo(BaseModel):
     id: uuid.UUID
     provider: str

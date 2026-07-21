@@ -26,3 +26,16 @@ def test_proxy_rejects_malformed_api_key() -> None:
 def test_admin_requires_bearer() -> None:
     resp = client.get("/v1/admin/me")
     assert resp.status_code == 401
+
+
+def test_models_preview_requires_bearer() -> None:
+    resp = client.post("/v1/admin/provider-keys/models-preview", json={"provider": "openrouter"})
+    assert resp.status_code == 401
+
+
+def test_update_provider_key_requires_bearer() -> None:
+    resp = client.patch(
+        "/v1/admin/provider-keys/00000000-0000-0000-0000-000000000000",
+        json={"default_model": "x"},
+    )
+    assert resp.status_code == 401

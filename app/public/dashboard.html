@@ -88,8 +88,13 @@
                         <input class="input" id="providerApiKey" type="password" placeholder="sk-..." autocomplete="off">
                     </div>
                     <div class="field">
-                        <label for="providerModel">Modelo <span class="muted">(padrão — recomendado para locais, ex.: llama3.1)</span></label>
-                        <input class="input" id="providerModel" type="text" placeholder="ex.: gpt-4o-mini, llama3.1, qwen2.5-coder">
+                        <label for="providerModel">Modelo padrão <span class="muted">(usado no roteamento aegis-auto e p/ locais)</span></label>
+                        <div style="display:flex; gap:0.5rem; align-items:stretch">
+                            <input class="input" id="providerModel" type="text" list="modelSuggestions" placeholder="clique em Carregar modelos ou digite" style="flex:1" autocomplete="off">
+                            <button class="btn btn-outline" type="button" id="loadModelsBtn">Carregar modelos</button>
+                        </div>
+                        <datalist id="modelSuggestions"></datalist>
+                        <span class="muted" id="modelsHint"></span>
                     </div>
                     <button class="btn btn-primary" type="submit" id="providerBtn">Adicionar credencial</button>
                 </form>
@@ -243,6 +248,32 @@
             const providerBaseUrl = document.getElementById('providerBaseUrl');
             const providerApiKey = document.getElementById('providerApiKey');
             const providerModel = document.getElementById('providerModel');
+            const loadModelsBtn = document.getElementById('loadModelsBtn');
+            const modelSuggestions = document.getElementById('modelSuggestions');
+            const modelsHint = document.getElementById('modelsHint');
+
+            loadModelsBtn.addEventListener('click', async () => {
+                modelsHint.textContent = 'Carregando modelos...';
+                loadModelsBtn.disabled = true;
+                try {
+                    const payload = {
+                        provider: providerSelect.value,
+                        base_url: providerBaseUrl.value.trim() || null,
+                        api_key: providerApiKey.value || null,
+                    };
+                    const res = await api('/v1/admin/provider-keys/models-preview', { method: 'POST', body: JSON.stringify(payload) });
+                    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || 'falha ao carregar modelos'); }
+                    const d = await res.json();
+                    modelSuggestions.innerHTML = (d.models || []).map(m => '<option value="' + escapeHtml(m) + '"></option>').join('');
+                    modelsHint.textContent = d.count
+                        ? (d.count + ' modelos carregados — clique no campo Modelo para escolher da lista')
+                        : 'Nenhum modelo retornado (confira a API key e a Base URL).';
+                } catch (err) {
+                    modelsHint.textContent = err.message;
+                } finally {
+                    loadModelsBtn.disabled = false;
+                }
+            });
             const providerBtn = document.getElementById('providerBtn');
             const providersContainer = document.getElementById('providersContainer');
             const uRequests = document.getElementById('uRequests');
@@ -424,9 +455,11 @@
                     const model = k.default_model
                         ? escapeHtml(k.default_model)
                         : '<span class="text-mono-mut">' + (k.is_local ? '⚠ defina o modelo' : 'por requisição') + '</span>';
+                    const setModelBtn = ' <button class="btn btn-outline btn-sm" data-setmodel="' + k.id + '">'
+                        + (k.default_model ? 'trocar' : 'definir') + '</button>';
                     html += '<tr>'
                         + '<td>' + providerCell + '</td>'
-                        + '<td class="mono">' + model + '</td>'
+                        + '<td class="mono">' + model + setModelBtn + '</td>'
                         + '<td class="mono" style="font-size:0.78rem">' + escapeHtml(k.base_url || '—') + '</td>'
                         + '<td>' + escapeHtml(k.label || '') + '</td>'
                         + '<td><button class="btn btn-danger btn-sm" data-delprov="' + k.id + '">Remover</button></td>'
@@ -437,6 +470,31 @@
                 providersContainer.querySelectorAll('[data-delprov]').forEach(btn => {
                     btn.addEventListener('click', () => deleteProviderKey(btn.getAttribute('data-delprov')));
                 });
+                providersContainer.querySelectorAll('[data-setmodel]').forEach(btn => {
+                    btn.addEventListener('click', () => setProviderModel(btn.getAttribute('data-setmodel')));
+                });
+            }
+
+            async function setProviderModel(id) {
+                clearMsg();
+                try {
+                    const res = await api('/v1/admin/provider-keys/' + id + '/models');
+                    if (!res.ok) throw new Error('falha ao listar modelos');
+                    const d = await res.json();
+                    const models = d.models || [];
+                    const lista = models.length
+                        ? 'Modelos disponíveis (' + models.length + '):\n\n' + models.slice(0, 50).join('\n')
+                            + (models.length > 50 ? '\n...' : '')
+                        : 'Não consegui listar modelos (confira a credencial).';
+                    const choice = prompt(lista + '\n\nDigite o modelo padrão:', models[0] || '');
+                    if (choice === null) return;
+                    const up = await api('/v1/admin/provider-keys/' + id, {
+                        method: 'PATCH', body: JSON.stringify({ default_model: choice.trim() || null }),
+                    });
+                    if (!up.ok) { const e = await up.json().catch(() => ({})); throw new Error(e.detail || 'falha ao atualizar'); }
+                    showMsg('Modelo padrão atualizado.', 'ok');
+                    await loadProviderKeys();
+                } catch (err) { showMsg(err.message, 'error'); }
             }
 
             providerForm.addEventListener('submit', async (e) => {
@@ -457,6 +515,7 @@
                         throw new Error(err.detail || 'falha ao adicionar credencial');
                     }
                     providerLabel.value = ''; providerBaseUrl.value = ''; providerApiKey.value = ''; providerModel.value = '';
+                    modelSuggestions.innerHTML = ''; modelsHint.textContent = '';
                     showMsg('Credencial adicionada e cifrada.', 'ok');
                     await loadProviderKeys();
                 } catch (err) {

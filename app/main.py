@@ -43,6 +43,7 @@ ARTICLES = {
     "ia-e-lgpd-como-usar-llms-em-conformidade": "artigo-ia-lgpd.html",
     "reduzir-custo-cursor-copilot-empresa": "artigo-cursor-copilot.html",
     "tokenizacao-e-uso-otimizado-de-ia-para-empresas": "artigo-tokenizacao-empresas.html",
+    "ia-no-desenvolvimento-eficiencia-de-tokens-e-lgpd": "artigo-ia-dev-tokens-lgpd.html",
 }
 
 

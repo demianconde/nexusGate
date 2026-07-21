@@ -518,7 +518,9 @@
                         + '<td class="mono">' + model + setModelBtn + '</td>'
                         + '<td class="mono" style="font-size:0.78rem">' + escapeHtml(k.base_url || '—') + '</td>'
                         + '<td>' + escapeHtml(k.label || '') + '</td>'
-                        + '<td><button class="btn btn-danger btn-sm" data-delprov="' + k.id + '">Remover</button></td>'
+                        + '<td style="white-space:nowrap">'
+                        + '<button class="btn btn-outline btn-sm" data-setkey="' + k.id + '">Trocar chave</button> '
+                        + '<button class="btn btn-danger btn-sm" data-delprov="' + k.id + '">Remover</button></td>'
                         + '</tr>';
                 }
                 html += '</tbody></table>';
@@ -529,6 +531,23 @@
                 providersContainer.querySelectorAll('[data-setmodel]').forEach(btn => {
                     btn.addEventListener('click', () => setProviderModel(btn.getAttribute('data-setmodel')));
                 });
+                providersContainer.querySelectorAll('[data-setkey]').forEach(btn => {
+                    btn.addEventListener('click', () => setProviderKey(btn.getAttribute('data-setkey')));
+                });
+            }
+
+            async function setProviderKey(id) {
+                clearMsg();
+                const newKey = prompt('Cole a nova API key do provedor (será cifrada):', '');
+                if (newKey === null) return;
+                try {
+                    const res = await api('/v1/admin/provider-keys/' + id, {
+                        method: 'PATCH', body: JSON.stringify({ api_key: newKey.trim() }),
+                    });
+                    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || 'falha ao atualizar chave'); }
+                    showMsg('Chave da credencial atualizada.', 'ok');
+                    await loadProviderKeys();
+                } catch (err) { showMsg(err.message, 'error'); }
             }
 
             async function setProviderModel(id) {

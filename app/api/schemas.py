@@ -49,6 +49,7 @@ class ProviderKeyCreate(BaseModel):
 
 class ProviderKeyUpdate(BaseModel):
     default_model: str | None = None  # define/troca o modelo padrão da credencial
+    api_key: str | None = None  # troca a chave da credencial (recifra); None = não altera
 
 
 class ProviderModelsPreview(BaseModel):

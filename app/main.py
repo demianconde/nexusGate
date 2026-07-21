@@ -42,6 +42,7 @@ ARTICLES = {
     "como-reduzir-custos-de-ia-guia-para-ctos": "artigo-reduzir-custos-ia.html",
     "ia-e-lgpd-como-usar-llms-em-conformidade": "artigo-ia-lgpd.html",
     "reduzir-custo-cursor-copilot-empresa": "artigo-cursor-copilot.html",
+    "tokenizacao-e-uso-otimizado-de-ia-para-empresas": "artigo-tokenizacao-empresas.html",
 }
 
 

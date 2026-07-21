@@ -35,18 +35,22 @@ def _key_secret(rec: ProviderKey) -> str:
     return decrypt_secret(rec.ciphertext, rec.nonce, rec.dek_wrapped)
 
 
-async def _list_provider_models(rec: ProviderKey, allow_private: bool) -> list[str]:
+async def fetch_models(fmt: str, base_url: str, api_key: str, allow_private: bool) -> list[str]:
+    """Lista os modelos de um endpoint de provedor (por formato). [] em qualquer falha.
+
+    Aceita parâmetros soltos (não só um registro salvo) para o painel poder sugerir
+    modelos ANTES de a credencial ser gravada.
+    """
     try:
-        await validate_endpoint_async(rec.base_url, allow_private)
+        await validate_endpoint_async(base_url, allow_private)
     except ValueError:
         return []
-    base = rec.base_url.rstrip("/")
-    api_key = _key_secret(rec)
+    base = base_url.rstrip("/")
     try:
         async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-            if rec.format == "anthropic":
+            if fmt == "anthropic":
                 return _ANTHROPIC_MODELS
-            if rec.format == "ollama":
+            if fmt == "ollama":
                 b = base[:-3] if base.endswith("/v1") else base
                 r = await client.get(f"{b}/api/tags")
                 if r.status_code >= 400:
@@ -60,6 +64,10 @@ async def _list_provider_models(rec: ProviderKey, allow_private: bool) -> list[s
             return [m.get("id", "") for m in r.json().get("data", []) if m.get("id")]
     except httpx.HTTPError:
         return []
+
+
+async def _list_provider_models(rec: ProviderKey, allow_private: bool) -> list[str]:
+    return await fetch_models(rec.format, rec.base_url, _key_secret(rec), allow_private)
 
 
 @router.get("/models")

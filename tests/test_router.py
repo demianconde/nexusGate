@@ -70,3 +70,11 @@ def test_none_when_no_eligible():
     # local sem default_model e nenhum hospedado
     route = choose_route("low", [FakeKey("ollama", "http://localhost:11434/v1", None)])
     assert route is None
+
+
+def test_openrouter_routes_by_tier():
+    # OpenRouter mapeado em PROVIDER_TIERS: roteia por tier (custo→qualidade).
+    keys = [FakeKey("openrouter", "https://openrouter.ai/api/v1", "openai/gpt-5-mini")]
+    assert choose_route("low", keys).model == "openai/gpt-5-nano"
+    assert choose_route("medium", keys).model == "openai/gpt-5-mini"
+    assert choose_route("high", keys).model == "anthropic/claude-opus-4.7"

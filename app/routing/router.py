@@ -426,6 +426,13 @@ PROVIDER_TIERS: dict[str, dict[str, str]] = {
     "mistral": {"cheap": "mistral-small", "mid": "mistral-medium", "premium": "mistral-large"},
     "groq": {"cheap": "llama-3.1-8b", "mid": "llama-3.3-70b", "premium": "llama-3.3-70b"},
     "together": {"cheap": "llama-3.1-8b", "mid": "llama-3.1-70b", "premium": "llama-3.1-70b"},
+    # OpenRouter agrega vários provedores; trio "Equilibrado" (custo→qualidade).
+    # Ajuste os modelos conforme os disponíveis na sua conta OpenRouter.
+    "openrouter": {
+        "cheap": "openai/gpt-5-nano",
+        "mid": "openai/gpt-5-mini",
+        "premium": "anthropic/claude-opus-4.7",
+    },
 }
 
 

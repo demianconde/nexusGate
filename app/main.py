@@ -178,8 +178,31 @@ def create_app() -> FastAPI:
 
     @app.get("/robots.txt", include_in_schema=False)
     async def robots() -> PlainTextResponse:
-        return PlainTextResponse(
-            "User-agent: *\nAllow: /\nSitemap: https://aegisflow.tech/sitemap.xml\n"
+        # Libera todos os crawlers, inclusive os de IA (busca generativa / grounding),
+        # explicitamente — sinaliza opt-in para AI Overviews, ChatGPT, Perplexity, Claude.
+        ai_bots = [
+            "GPTBot", "OAI-SearchBot", "ChatGPT-User",  # OpenAI
+            "ClaudeBot", "Claude-SearchBot", "anthropic-ai", "Claude-User",  # Anthropic
+            "PerplexityBot", "Perplexity-User",  # Perplexity
+            "Google-Extended",  # Google (Gemini / AI Overviews)
+            "Applebot-Extended",  # Apple Intelligence
+            "CCBot",  # Common Crawl (treina vários modelos)
+            "Bytespider", "Amazonbot", "cohere-ai", "YouBot", "DuckAssistBot",
+        ]
+        groups = "User-agent: *\nAllow: /\n\n"
+        groups += "\n\n".join(f"User-agent: {b}\nAllow: /" for b in ai_bots)
+        body = (
+            f"{groups}\n\n"
+            "Sitemap: https://aegisflow.tech/sitemap.xml\n"
+            "# Resumo para agentes de IA: https://aegisflow.tech/llms.txt\n"
+        )
+        return PlainTextResponse(body)
+
+    @app.get("/llms.txt", include_in_schema=False)
+    async def llms_txt() -> FileResponse:
+        # Convenção llmstxt.org: resumo estruturado do site para agentes de IA.
+        return FileResponse(
+            PUBLIC_DIR / "llms.txt", media_type="text/markdown; charset=utf-8"
         )
 
     @app.get("/sitemap.xml", include_in_schema=False)

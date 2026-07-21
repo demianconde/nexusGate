@@ -1,0 +1,43 @@
+# AegisFlow
+
+> AegisFlow é um gateway de IA (LLM Gateway / AI Proxy) no modelo BYOK, feito para empresas brasileiras. Ele fica entre as aplicações do cliente e os provedores de IA (OpenAI, Anthropic, Google, OpenRouter e modelos locais), roteando cada requisição para o modelo mais barato que resolve, com cache semântico, economia auditável, dados no Brasil e conformidade com a LGPD.
+
+Fatos principais (aegisflow.tech):
+- BYOK (Bring Your Own Key): o cliente usa as próprias chaves dos provedores; **zero markup sobre tokens**.
+- Roteamento por custo/qualidade (`aegis-auto`): classifica a complexidade do prompt e escolhe o tier adequado (barato → premium), com fallback automático entre provedores.
+- Cache semântico: reaproveita respostas de prompts similares, reduzindo custo.
+- Compatível com a API da OpenAI: basta trocar a `base_url` e usar a chave do AegisFlow no header `x-api-key` — sem reescrever integrações.
+- Suporta qualquer LLM: OpenAI, Anthropic, Google, Qwen, DeepSeek, Groq, Together, OpenRouter e modelos locais (Ollama, LM Studio, vLLM).
+- Segurança e LGPD: chaves cifradas em repouso (AES-256-GCM), redação de PII antes de provedores hospedados, logs sem segredos.
+- Dados no Brasil (região São Paulo, `sa-east-1`), painel e suporte em português, preços em BRL com Pix, boleto e cartão.
+- Plano grátis (Hobby): R$ 0, sem cartão de crédito, cadastro self-service.
+
+## Planos e preços
+- **Hobby (grátis):** R$ 0/mês — 60 requisições/min, 10.000 requisições/mês, roteamento por custo, cache semântico, cofre BYOK cifrado.
+- **Pro:** R$ 249/mês — roteamento avançado + fallback, relatório de economia exportável (CSV), qualquer LLM (nuvem ou local).
+- **Teams:** R$ 999/mês — chaves virtuais (orçamento/limite por chave), guardrails + redação de PII (LGPD), logs de requisições.
+- **Enterprise:** sob consulta — SSO/SAML, SLA, on-premise/VPC dedicada, suporte dedicado.
+
+## Como funciona (integração)
+- Endpoint principal: `POST https://aegisflow.tech/v1/chat/completions` (formato OpenAI), header `x-api-key: agf_...`.
+- Roteamento automático: use `"model": "aegis-auto"` para deixar o AegisFlow escolher o modelo por complexidade.
+- Também oferece `/v1/models` e `/v1/embeddings` (compatíveis com OpenAI, via BYOK).
+
+## Links
+- [Site](https://aegisflow.tech): visão geral, simulador de economia e preços.
+- [Documentação da API](https://aegisflow.tech/documentacao): integração compatível com OpenAI, endpoints e exemplos.
+- [Criar conta grátis](https://aegisflow.tech/login): cadastro do plano Hobby (grátis, sem cartão).
+
+## Artigos (guias)
+- [O que é um LLM Gateway (AI Proxy)](https://aegisflow.tech/artigos/o-que-e-llm-gateway-ai-proxy)
+- [Como reduzir custos de IA sem perder qualidade (guia para CTOs)](https://aegisflow.tech/artigos/como-reduzir-custos-de-ia-guia-para-ctos)
+- [Token Maxxing: o vazamento silencioso de caixa em IA](https://aegisflow.tech/artigos/token-maxxing-vazamento-de-caixa-em-ia)
+- [Tokenização e uso otimizado de IA para empresas](https://aegisflow.tech/artigos/tokenizacao-e-uso-otimizado-de-ia-para-empresas)
+- [IA no desenvolvimento: eficiência de tokens, LGPD e dados no Brasil](https://aegisflow.tech/artigos/ia-no-desenvolvimento-eficiencia-de-tokens-e-lgpd)
+- [IA e LGPD: como usar LLMs em conformidade](https://aegisflow.tech/artigos/ia-e-lgpd-como-usar-llms-em-conformidade)
+- [Qual a melhor ferramenta de otimização de tokens de IA no Brasil](https://aegisflow.tech/artigos/melhor-ferramenta-otimizacao-de-tokens-de-ia-no-brasil)
+- [Como reduzir o custo do Cursor e do Copilot na empresa](https://aegisflow.tech/artigos/reduzir-custo-cursor-copilot-empresa)
+
+## Contato
+- E-mail: contato@aegisflow.tech
+- Site: https://aegisflow.tech

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Painel · AegisFlow</title>
-    <link rel="stylesheet" href="/static/styles.css?v=3">
+    <link rel="stylesheet" href="/static/styles.css?v=5">
     <script src="/static/vendor/supabase.js"></script>
 </head>
 <body>
@@ -90,10 +90,9 @@
                     <div class="field">
                         <label for="providerModel">Modelo padrão <span class="muted">(usado no roteamento aegis-auto e p/ locais)</span></label>
                         <div style="display:flex; gap:0.5rem; align-items:stretch">
-                            <input class="input" id="providerModel" type="text" list="modelSuggestions" placeholder="clique em Carregar modelos ou digite" style="flex:1" autocomplete="off">
-                            <button class="btn btn-outline" type="button" id="loadModelsBtn">Carregar modelos</button>
+                            <input class="input" id="providerModel" type="text" placeholder="ex.: openai/gpt-5-mini — ou clique em Escolher modelo" style="flex:1" autocomplete="off">
+                            <button class="btn btn-outline" type="button" id="loadModelsBtn">Escolher modelo</button>
                         </div>
-                        <datalist id="modelSuggestions"></datalist>
                         <span class="muted" id="modelsHint"></span>
                     </div>
                     <button class="btn btn-primary" type="submit" id="providerBtn">Adicionar credencial</button>
@@ -249,7 +248,6 @@
             const providerApiKey = document.getElementById('providerApiKey');
             const providerModel = document.getElementById('providerModel');
             const loadModelsBtn = document.getElementById('loadModelsBtn');
-            const modelSuggestions = document.getElementById('modelSuggestions');
             const modelsHint = document.getElementById('modelsHint');
 
             loadModelsBtn.addEventListener('click', async () => {
@@ -264,10 +262,17 @@
                     const res = await api('/v1/admin/provider-keys/models-preview', { method: 'POST', body: JSON.stringify(payload) });
                     if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || 'falha ao carregar modelos'); }
                     const d = await res.json();
-                    modelSuggestions.innerHTML = (d.models || []).map(m => '<option value="' + escapeHtml(m) + '"></option>').join('');
-                    modelsHint.textContent = d.count
-                        ? (d.count + ' modelos carregados — clique no campo Modelo para escolher da lista')
-                        : 'Nenhum modelo retornado (confira a API key e a Base URL).';
+                    const models = d.models || [];
+                    if (!models.length) {
+                        modelsHint.textContent = 'Nenhum modelo retornado (confira a API key e a Base URL).';
+                        return;
+                    }
+                    modelsHint.textContent = models.length + ' modelos disponíveis';
+                    const chosen = await openModelPicker(models, providerModel.value);
+                    if (chosen) {
+                        providerModel.value = chosen;
+                        modelsHint.textContent = 'Modelo escolhido: ' + chosen;
+                    }
                 } catch (err) {
                     modelsHint.textContent = err.message;
                 } finally {
@@ -309,6 +314,45 @@
 
             function fmtDate(iso) {
                 try { return new Date(iso).toLocaleDateString('pt-BR'); } catch (e) { return iso; }
+            }
+
+            // Modal reutilizável de seleção de modelo (busca + lista rolável estilizada).
+            function openModelPicker(models, current) {
+                return new Promise((resolve) => {
+                    const overlay = document.getElementById('modelPicker');
+                    const search = document.getElementById('modelPickerSearch');
+                    const list = document.getElementById('modelPickerList');
+                    const closeBtn = document.getElementById('modelPickerClose');
+                    let done = false;
+
+                    function render(filter) {
+                        const q = (filter || '').trim().toLowerCase();
+                        const matches = models.filter(m => m.toLowerCase().includes(q));
+                        const shown = matches.slice(0, 200);
+                        if (!matches.length) { list.innerHTML = '<div class="modal-empty">Nenhum modelo encontrado.</div>'; return; }
+                        list.innerHTML = shown.map(m => '<div class="combo-item" data-model="' + escapeHtml(m) + '">' + escapeHtml(m) + '</div>').join('')
+                            + (matches.length > shown.length ? '<div class="modal-empty">Refine a busca para ver mais (' + matches.length + ' no total)…</div>' : '');
+                    }
+                    function cleanup(val) {
+                        if (done) return; done = true;
+                        overlay.hidden = true;
+                        list.onclick = null; search.oninput = null; closeBtn.onclick = null; overlay.onclick = null;
+                        document.removeEventListener('keydown', onKey);
+                        resolve(val);
+                    }
+                    function onKey(e) { if (e.key === 'Escape') cleanup(null); }
+
+                    search.value = '';
+                    render('');
+                    overlay.hidden = false;
+                    setTimeout(() => search.focus(), 0);
+
+                    list.onclick = (e) => { const it = e.target.closest('[data-model]'); if (it) cleanup(it.getAttribute('data-model')); };
+                    search.oninput = () => render(search.value);
+                    closeBtn.onclick = () => cleanup(null);
+                    overlay.onclick = (e) => { if (e.target === overlay) cleanup(null); };
+                    document.addEventListener('keydown', onKey);
+                });
             }
 
             async function loadMe() {
@@ -482,14 +526,16 @@
                     if (!res.ok) throw new Error('falha ao listar modelos');
                     const d = await res.json();
                     const models = d.models || [];
-                    const lista = models.length
-                        ? 'Modelos disponíveis (' + models.length + '):\n\n' + models.slice(0, 50).join('\n')
-                            + (models.length > 50 ? '\n...' : '')
-                        : 'Não consegui listar modelos (confira a credencial).';
-                    const choice = prompt(lista + '\n\nDigite o modelo padrão:', models[0] || '');
-                    if (choice === null) return;
+                    let choice;
+                    if (models.length) {
+                        choice = await openModelPicker(models, '');
+                        if (choice === null) return;  // cancelou
+                    } else {
+                        choice = prompt('Não consegui listar modelos (confira a credencial). Digite o modelo manualmente:', '');
+                        if (choice === null) return;
+                    }
                     const up = await api('/v1/admin/provider-keys/' + id, {
-                        method: 'PATCH', body: JSON.stringify({ default_model: choice.trim() || null }),
+                        method: 'PATCH', body: JSON.stringify({ default_model: (choice || '').trim() || null }),
                     });
                     if (!up.ok) { const e = await up.json().catch(() => ({})); throw new Error(e.detail || 'falha ao atualizar'); }
                     showMsg('Modelo padrão atualizado.', 'ok');
@@ -515,7 +561,7 @@
                         throw new Error(err.detail || 'falha ao adicionar credencial');
                     }
                     providerLabel.value = ''; providerBaseUrl.value = ''; providerApiKey.value = ''; providerModel.value = '';
-                    modelSuggestions.innerHTML = ''; modelsHint.textContent = '';
+                    modelsHint.textContent = '';
                     showMsg('Credencial adicionada e cifrada.', 'ok');
                     await loadProviderKeys();
                 } catch (err) {
@@ -988,5 +1034,17 @@
             init();
         })();
     </script>
+
+    <!-- Modal de seleção de modelo (reutilizado pelo form e pela tabela) -->
+    <div class="modal-overlay" id="modelPicker" hidden>
+        <div class="modal-card glass">
+            <div class="modal-head">
+                <h3>Escolher modelo</h3>
+                <button class="modal-close" id="modelPickerClose" type="button" aria-label="Fechar">✕</button>
+            </div>
+            <input class="input" id="modelPickerSearch" type="text" placeholder="Buscar modelo..." autocomplete="off">
+            <div class="modal-list" id="modelPickerList"></div>
+        </div>
+    </div>
 </body>
 </html>
